@@ -1,0 +1,26 @@
+
+<nav class="bg-white shadow-md mb-8">
+  <div class="container mx-auto px-4">
+    <div class="flex justify-between items-center py-4">
+      <a href="/" class="text-xl font-semibold text-indigo-600">CollectFlo</a>
+      <div class="flex items-center space-x-6">
+        <div id="nav-links">
+          <a href="/login" class="text-gray-600 hover:text-indigo-600">Login</a>
+        </div>
+        <a href="/help" class="text-gray-600 hover:text-indigo-600">Help</a>
+        <a href="/privacy" class="text-gray-600 hover:text-indigo-600">Privacy Policy</a>
+        <div id="user-menu" class="hidden items-center space-x-4">
+          <span id="userDisplay" class="text-gray-600 text-sm"></span>
+          <button onclick="logout()" class="bg-gray-800 text-white hover:bg-gray-700 px-3 py-2 rounded-md text-sm font-medium">
+            Logout
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<script>
+  // Navigation logic is now handled in nav.js after authentication check
+</script>
+</nav>

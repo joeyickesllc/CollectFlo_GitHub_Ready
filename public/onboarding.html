@@ -1,0 +1,169 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Welcome to CollectFlo</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script src="/nav.js"></script>
+</head>
+<body class="bg-gray-50">
+  <div id="nav-placeholder"></div>
+
+  <div class="container mx-auto px-4 py-16">
+    <div class="max-w-2xl mx-auto">
+      <div class="text-center mb-8">
+        <div class="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+        </div>
+        <h1 class="text-3xl font-bold mb-4">Welcome to CollectFlo!</h1>
+        <p class="text-xl text-gray-600 mb-2">Your account has been created successfully.</p>
+        <p class="text-gray-600">You now have <strong>30 days of free trial access</strong> to all CollectFlo features.</p>
+      </div>
+
+      <div class="bg-white p-8 rounded-lg shadow-lg mb-8">
+        <h2 class="text-2xl font-semibold mb-6 text-center">Let's Get You Started</h2>
+        
+        <div class="space-y-6" id="onboardingSteps">
+          <div class="flex items-start space-x-4">
+            <div id="step1Circle" class="flex-shrink-0 w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center text-sm font-bold">1</div>
+            <div>
+              <h3 class="text-lg font-medium mb-2">Connect Your QuickBooks Account</h3>
+              <p class="text-gray-600 mb-4">Securely link your QuickBooks Online account so CollectFlo can automatically track your invoices and payments.</p>
+            </div>
+          </div>
+          
+          <div id="qboConnectButton" class="text-center my-6">
+            <a href="/auth/qbo?redirect=onboarding" class="inline-flex items-center px-6 py-3 bg-indigo-600 text-white text-lg font-medium rounded-lg hover:bg-indigo-700 transition-colors">
+              <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+              </svg>
+              Connect QuickBooks Now
+            </a>
+          </div>
+          
+          <div class="flex items-start space-x-4">
+            <div id="step2Circle" class="flex-shrink-0 w-8 h-8 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-sm font-bold">2</div>
+            <div>
+              <h3 class="text-lg font-medium mb-2">Customize Your Settings</h3>
+              <p class="text-gray-600 mb-2">Set up your company information and customize your automated follow-up messages.</p>
+            </div>
+          </div>
+          
+          <div id="settingsButton" class="text-center my-6" style="display: none;">
+            <a href="/settings?redirect=onboarding" class="inline-flex items-center px-6 py-3 bg-indigo-600 text-white text-lg font-medium rounded-lg hover:bg-indigo-700 transition-colors">
+              <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              </svg>
+              Customize Your Settings Now
+            </a>
+          </div>
+          
+          <div class="flex items-start space-x-4">
+            <div id="step3Circle" class="flex-shrink-0 w-8 h-8 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-sm font-bold">3</div>
+            <div>
+              <h3 class="text-lg font-medium mb-2">Start Automating</h3>
+              <p id="step3Text" class="text-gray-600">Watch as CollectFlo automatically follows up on your unpaid invoices and improves your cash flow.</p>
+            </div>
+          </div>
+        </div>
+
+        <div id="dashboardButton" class="mt-8 text-center" style="display: none;">
+          <a href="/dashboard" class="inline-flex items-center px-6 py-3 bg-indigo-600 text-white text-lg font-medium rounded-lg hover:bg-indigo-700 transition-colors">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+            </svg>
+            Go to Dashboard
+          </a>
+        </div>
+
+        <div class="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <div class="flex items-start">
+            <svg class="w-5 h-5 text-blue-600 mt-0.5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <div class="text-sm text-blue-800">
+              <p class="font-medium mb-1">Your trial includes:</p>
+              <ul class="space-y-1">
+                <li>• Unlimited automated follow-ups</li>
+                <li>• Complete QuickBooks integration</li>
+                <li>• Email and SMS notifications</li>
+                <li>• Payment collection automation</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="text-center">
+        <p class="text-gray-600 mb-4">Need help getting started?</p>
+        <a href="/help" class="text-indigo-600 hover:text-indigo-800 font-medium">Contact Support</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Check if user is coming from successful signup
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('from') === 'signup') {
+      // Show a brief welcome animation or additional messaging
+      document.body.classList.add('animate-fadeIn');
+    }
+
+    // Check onboarding progress and update UI accordingly
+    async function checkOnboardingProgress() {
+      try {
+        // Check QBO connection status
+        const qboResponse = await fetch('/qbo/company-info');
+        const qboConnected = qboResponse.ok;
+        
+        // Check if settings have been configured
+        const settingsResponse = await fetch('/api/settings');
+        const settings = await settingsResponse.json();
+        const settingsConfigured = settings.company_name && settings.email;
+        
+        updateOnboardingUI(qboConnected, settingsConfigured);
+        
+      } catch (error) {
+        console.error('Error checking onboarding progress:', error);
+      }
+    }
+
+    function updateOnboardingUI(qboConnected, settingsConfigured) {
+      const step1Circle = document.getElementById('step1Circle');
+      const step2Circle = document.getElementById('step2Circle');
+      const step3Circle = document.getElementById('step3Circle');
+      const qboButton = document.getElementById('qboConnectButton');
+      const settingsButton = document.getElementById('settingsButton');
+      const dashboardButton = document.getElementById('dashboardButton');
+      const step3Text = document.getElementById('step3Text');
+
+      if (qboConnected) {
+        // Step 1 completed
+        step1Circle.className = 'flex-shrink-0 w-8 h-8 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-sm font-bold';
+        qboButton.style.display = 'none';
+        
+        if (settingsConfigured) {
+          // Step 2 completed
+          step2Circle.className = 'flex-shrink-0 w-8 h-8 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-sm font-bold';
+          settingsButton.style.display = 'none';
+          
+          // Step 3 active
+          step3Circle.className = 'flex-shrink-0 w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center text-sm font-bold';
+          step3Text.textContent = 'You\'re all set! Visit your dashboard to see your synced invoices and start the automated follow-up flow.';
+          dashboardButton.style.display = 'block';
+        } else {
+          // Step 2 active
+          step2Circle.className = 'flex-shrink-0 w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center text-sm font-bold';
+          settingsButton.style.display = 'block';
+        }
+      }
+    }
+
+    // Initialize onboarding progress check
+    checkOnboardingProgress();
+  </script>
+</body>
+</html>

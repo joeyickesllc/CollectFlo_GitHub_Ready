@@ -1,0 +1,113 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pay Invoice - CollectFlo</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+</head>
+<body class="bg-gray-50">
+    <div class="container mx-auto px-4 py-16">
+        <div class="max-w-md mx-auto bg-white rounded-lg shadow-lg p-8">
+            <h1 class="text-2xl font-bold mb-6 text-center">Pay Your Invoice</h1>
+            
+            <div id="invoiceDetails" class="mb-6">
+                <div class="bg-gray-50 p-4 rounded">
+                    <p><strong>Invoice #:</strong> <span id="invoiceNumber">Loading...</span></p>
+                    <p><strong>Amount Due:</strong> <span id="amountDue">Loading...</span></p>
+                    <p><strong>Due Date:</strong> <span id="dueDate">Loading...</span></p>
+                </div>
+            </div>
+
+            <form id="paymentForm" onsubmit="handlePayment(event)">
+                <!-- reCAPTCHA -->
+                <div class="mb-6 flex justify-center">
+                    <div class="g-recaptcha" data-sitekey="YOUR_RECAPTCHA_SITE_KEY"></div>
+                </div>
+
+                <button type="submit" id="payButton" 
+                        class="w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                    Pay Now with QuickBooks
+                </button>
+            </form>
+
+            <div class="mt-4 text-center text-sm text-gray-600">
+                <p>Secure payment processing by Intuit Payments</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Load invoice details from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const invoiceId = urlParams.get('invoice');
+        
+        async function loadInvoiceDetails() {
+            if (!invoiceId) {
+                document.getElementById('invoiceDetails').innerHTML = '<p class="text-red-600">Invalid invoice link</p>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/invoice/${invoiceId}`);
+                const invoice = await response.json();
+                
+                document.getElementById('invoiceNumber').textContent = invoice.invoice_id;
+                document.getElementById('amountDue').textContent = `$${invoice.balance.toFixed(2)}`;
+                document.getElementById('dueDate').textContent = new Date(invoice.due_date).toLocaleDateString();
+            } catch (error) {
+                console.error('Error loading invoice:', error);
+                document.getElementById('invoiceDetails').innerHTML = '<p class="text-red-600">Error loading invoice details</p>';
+            }
+        }
+
+        async function handlePayment(event) {
+            event.preventDefault();
+            
+            // Get reCAPTCHA response
+            const recaptchaResponse = grecaptcha.getResponse();
+            if (!recaptchaResponse) {
+                alert('Please complete the reCAPTCHA verification');
+                return;
+            }
+
+            const payButton = document.getElementById('payButton');
+            payButton.disabled = true;
+            payButton.textContent = 'Processing...';
+
+            try {
+                const response = await fetch('/api/create-payment-link', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        invoice_id: invoiceId,
+                        recaptcha_response: recaptchaResponse
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Redirect to Intuit payment processor
+                    window.location.href = result.payment_url;
+                } else {
+                    throw new Error(result.error || 'Payment processing failed');
+                }
+            } catch (error) {
+                console.error('Payment error:', error);
+                alert('Payment processing failed. Please try again.');
+                payButton.disabled = false;
+                payButton.textContent = 'Pay Now with QuickBooks';
+                grecaptcha.reset();
+            }
+        }
+
+        // Load invoice details on page load
+        loadInvoiceDetails();
+    </script>
+</body>
+</html>
