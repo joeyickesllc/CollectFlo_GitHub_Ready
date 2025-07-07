@@ -27,6 +27,8 @@ const apiRoutes = require('./backend/routes/api');
 const logger = require('./backend/services/logger');
 const jobQueue = require('./backend/services/jobQueue');
 // const errorHandler = require('./services/errorHandler'); // This is now replaced by errorMiddleware
+// Migration runner
+const runMigrations = require('./backend/scripts/runMigrations');
 
 // Environment variables
 const PORT = process.env.PORT || 3000;
@@ -151,13 +153,31 @@ app.use((err, req, res, next) => {
   errorMiddleware(err, req, res, next);
 });
 
-// Start the server
-const server = app.listen(PORT, () => {
-  logger.info(`CollectFlo server listening on port ${PORT} in ${NODE_ENV} mode`);
-});
+// -----------------------------------------------------------------------------
+// Bootstrap sequence: run DB migrations, then start server & scheduler
+// -----------------------------------------------------------------------------
+let server; // will hold HTTP server instance for graceful shutdown
 
-// Initialize scheduled jobs
-require('./services/scheduler');
+async function bootstrap() {
+  try {
+    // Run pending migrations before the app starts accepting traffic
+    await runMigrations();
+
+    // Start the HTTP server
+    server = app.listen(PORT, () => {
+      logger.info(`CollectFlo server listening on port ${PORT} in ${NODE_ENV} mode`);
+    });
+
+    // Initialize scheduled jobs only after successful start
+    require('./services/scheduler');
+  } catch (error) {
+    logger.error('Failed to start application due to startup error', { error });
+    process.exit(1); // Exit with failure so Render restarts / reports the issue
+  }
+}
+
+// Kick off the bootstrap process
+bootstrap();
 
 // Graceful shutdown
 process.on('SIGTERM', gracefulShutdown);
