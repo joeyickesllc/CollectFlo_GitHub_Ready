@@ -8,137 +8,221 @@
 const express = require('express');
 const router = express.Router();
 
-// Import controllers (to be implemented)
-// const authController = require('../controllers/authController');
+// Import controllers
+const authController = require('../controllers/authController');
+const betaController = require('../controllers/betaController');
 // const dashboardController = require('../controllers/dashboardController');
 // const settingsController = require('../controllers/settingsController');
 // const invoiceController = require('../controllers/invoiceController');
-// const betaController = require('../controllers/betaController');
+// const qboController = require('../controllers/qboController');
+// const testController = require('../controllers/testController');
 
-// Import middleware (to be implemented)
-// const { requireAuth } = require('../middleware/authMiddleware');
+// Import middleware
+const { requireAuth } = require('../middleware/authMiddleware');
+const errorMiddleware = require('../middleware/errorMiddleware');
+const logger = require('../services/logger');
+
+// Apply request logger middleware to all API routes
+router.use(logger.requestLogger);
 
 /**
  * Authentication Routes
  */
-router.post('/login', (req, res) => {
-  // Will be replaced with authController.login
-  res.status(501).json({ message: 'Not implemented yet' });
+router.post('/login', async (req, res, next) => {
+  try {
+    await authController.login(req, res);
+  } catch (error) {
+    next(error);
+  }
 });
 
-router.post('/signup', (req, res) => {
-  // Will be replaced with authController.signup
-  res.status(501).json({ message: 'Not implemented yet' });
+router.post('/signup', async (req, res, next) => {
+  try {
+    await authController.signup(req, res);
+  } catch (error) {
+    next(error);
+  }
 });
 
-router.post('/logout', (req, res) => {
-  // Will be replaced with authController.logout
-  res.status(501).json({ message: 'Not implemented yet' });
+router.post('/logout', async (req, res, next) => {
+  try {
+    await authController.logout(req, res);
+  } catch (error) {
+    next(error);
+  }
 });
 
-router.get('/check-auth', (req, res) => {
-  // Will be replaced with authController.checkAuth
-  res.status(501).json({ message: 'Not implemented yet' });
+router.get('/check-auth', async (req, res, next) => {
+  try {
+    await authController.checkAuth(req, res);
+  } catch (error) {
+    next(error);
+  }
 });
 
 /**
  * Dashboard Routes
  * All dashboard routes require authentication
  */
-router.get('/dashboard/stats', (req, res) => {
-  // Will be replaced with dashboardController.getStats
-  res.status(501).json({ message: 'Not implemented yet' });
+router.get('/dashboard/stats', requireAuth, async (req, res, next) => {
+  try {
+    // Will be replaced with dashboardController.getStats
+    res.status(501).json({ message: 'Not implemented yet' });
+  } catch (error) {
+    next(error);
+  }
 });
 
-router.get('/invoices', (req, res) => {
-  // Will be replaced with dashboardController.getInvoices
-  res.status(501).json({ message: 'Not implemented yet' });
+router.get('/invoices', requireAuth, async (req, res, next) => {
+  try {
+    // Will be replaced with dashboardController.getInvoices
+    res.status(501).json({ message: 'Not implemented yet' });
+  } catch (error) {
+    next(error);
+  }
 });
 
-router.post('/invoices/:id/exclude', (req, res) => {
-  // Will be replaced with dashboardController.excludeInvoice
-  res.status(501).json({ message: 'Not implemented yet' });
+router.post('/invoices/:id/exclude', requireAuth, async (req, res, next) => {
+  try {
+    // Will be replaced with dashboardController.excludeInvoice
+    res.status(501).json({ message: 'Not implemented yet' });
+  } catch (error) {
+    next(error);
+  }
 });
 
 /**
  * Settings Routes
  * All settings routes require authentication
  */
-router.get('/settings', (req, res) => {
-  // Will be replaced with settingsController.getSettings
-  res.status(501).json({ message: 'Not implemented yet' });
+router.get('/settings', requireAuth, async (req, res, next) => {
+  try {
+    // Will be replaced with settingsController.getSettings
+    res.status(501).json({ message: 'Not implemented yet' });
+  } catch (error) {
+    next(error);
+  }
 });
 
-router.post('/settings', (req, res) => {
-  // Will be replaced with settingsController.updateSettings
-  res.status(501).json({ message: 'Not implemented yet' });
+router.post('/settings', requireAuth, async (req, res, next) => {
+  try {
+    // Will be replaced with settingsController.updateSettings
+    res.status(501).json({ message: 'Not implemented yet' });
+  } catch (error) {
+    next(error);
+  }
 });
 
-router.post('/settings/logo', (req, res) => {
-  // Will be replaced with settingsController.uploadLogo
-  res.status(501).json({ message: 'Not implemented yet' });
+router.post('/settings/logo', requireAuth, async (req, res, next) => {
+  try {
+    // Will be replaced with settingsController.uploadLogo
+    res.status(501).json({ message: 'Not implemented yet' });
+  } catch (error) {
+    next(error);
+  }
 });
 
-router.get('/templates', (req, res) => {
-  // Will be replaced with settingsController.getTemplates
-  res.status(501).json({ message: 'Not implemented yet' });
+router.get('/templates', requireAuth, async (req, res, next) => {
+  try {
+    // Will be replaced with settingsController.getTemplates
+    res.status(501).json({ message: 'Not implemented yet' });
+  } catch (error) {
+    next(error);
+  }
 });
 
-router.post('/templates/:id', (req, res) => {
-  // Will be replaced with settingsController.updateTemplate
-  res.status(501).json({ message: 'Not implemented yet' });
+router.post('/templates/:id', requireAuth, async (req, res, next) => {
+  try {
+    // Will be replaced with settingsController.updateTemplate
+    res.status(501).json({ message: 'Not implemented yet' });
+  } catch (error) {
+    next(error);
+  }
 });
 
 /**
  * Invoice & Payment Routes
  */
-router.get('/create-payment-link/:invoiceId', (req, res) => {
-  // Will be replaced with invoiceController.createPaymentLink
-  res.status(501).json({ message: 'Not implemented yet' });
+router.get('/create-payment-link/:invoiceId', async (req, res, next) => {
+  try {
+    // Will be replaced with invoiceController.createPaymentLink
+    res.status(501).json({ message: 'Not implemented yet' });
+  } catch (error) {
+    next(error);
+  }
 });
 
-router.post('/check-payments', (req, res) => {
-  // Will be replaced with invoiceController.checkPayments
-  res.status(501).json({ message: 'Not implemented yet' });
+router.post('/check-payments', async (req, res, next) => {
+  try {
+    // Will be replaced with invoiceController.checkPayments
+    res.status(501).json({ message: 'Not implemented yet' });
+  } catch (error) {
+    next(error);
+  }
 });
 
-router.post('/sync-invoices', (req, res) => {
-  // Will be replaced with invoiceController.syncInvoices
-  res.status(501).json({ message: 'Not implemented yet' });
+router.post('/sync-invoices', async (req, res, next) => {
+  try {
+    // Will be replaced with invoiceController.syncInvoices
+    res.status(501).json({ message: 'Not implemented yet' });
+  } catch (error) {
+    next(error);
+  }
 });
 
 /**
  * Beta Program Routes
  */
-router.post('/beta-signup', (req, res) => {
-  // Will be replaced with betaController.signup
-  res.status(501).json({ message: 'Not implemented yet' });
+router.post('/beta-signup', async (req, res, next) => {
+  try {
+    await betaController.signup(req, res);
+  } catch (error) {
+    next(error);
+  }
 });
 
-router.get('/beta-stats', (req, res) => {
-  // Will be replaced with betaController.getStats
-  res.status(501).json({ message: 'Not implemented yet' });
+router.get('/beta-stats', requireAuth, async (req, res, next) => {
+  try {
+    await betaController.getStats(req, res);
+  } catch (error) {
+    next(error);
+  }
 });
 
 /**
  * QuickBooks Integration Routes
  */
-router.get('/qbo/status', (req, res) => {
-  // Will be replaced with qboController.getStatus
-  res.status(501).json({ message: 'Not implemented yet' });
+router.get('/qbo/status', requireAuth, async (req, res, next) => {
+  try {
+    // Will be replaced with qboController.getStatus
+    res.status(501).json({ message: 'Not implemented yet' });
+  } catch (error) {
+    next(error);
+  }
 });
 
-router.post('/qbo/disconnect', (req, res) => {
-  // Will be replaced with qboController.disconnect
-  res.status(501).json({ message: 'Not implemented yet' });
+router.post('/qbo/disconnect', requireAuth, async (req, res, next) => {
+  try {
+    // Will be replaced with qboController.disconnect
+    res.status(501).json({ message: 'Not implemented yet' });
+  } catch (error) {
+    next(error);
+  }
 });
 
 /**
  * Test Routes (for development only)
  */
-router.post('/test-email', (req, res) => {
-  // Will be replaced with testController.sendTestEmail
-  res.status(501).json({ message: 'Not implemented yet' });
+router.post('/test-email', async (req, res, next) => {
+  try {
+    // Will be replaced with testController.sendTestEmail
+    res.status(501).json({ message: 'Not implemented yet' });
+  } catch (error) {
+    next(error);
+  }
 });
+
+// Centralized error handling for API routes
+router.use(errorMiddleware);
 
 module.exports = router;

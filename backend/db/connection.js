@@ -16,6 +16,7 @@ const { Pool } = require('pg');
 const BetterSqlite3 = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
+const logger = require('../services/logger'); // <— centralized Winston logger
 
 // Environment configuration
 const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -55,45 +56,79 @@ function initializeDatabase() {
     
     // Test the connection
     pool.query('SELECT NOW()')
-      .then(() => console.log('PostgreSQL database connected'))
-      .catch(err => console.error('PostgreSQL connection error:', err));
+      .then(() => logger.info('PostgreSQL database connected'))
+      .catch(err => logger.error('PostgreSQL connection error', { error: err }));
       
     // Handle pool errors
     pool.on('error', (err) => {
-      console.error('Unexpected PostgreSQL pool error:', err);
+      logger.error('Unexpected PostgreSQL pool error', { error: err });
     });
     
     // Create a query function that works with promises
     db = {
       query: async (text, params) => {
+        const start = Date.now();
         try {
           const result = await pool.query(text, params);
+          logger.info('DB query success', {
+            text,
+            params,
+            duration: Date.now() - start
+          });
           return result.rows;
         } catch (err) {
-          console.error('Database query error:', err);
+          logger.error('Database query error', {
+            text,
+            params,
+            error: err,
+            duration: Date.now() - start
+          });
           throw err;
         }
       },
       
       queryOne: async (text, params) => {
+        const start = Date.now();
         try {
           const result = await pool.query(text, params);
+          logger.info('DB queryOne success', {
+            text,
+            params,
+            duration: Date.now() - start
+          });
           return result.rows[0] || null;
         } catch (err) {
-          console.error('Database queryOne error:', err);
+          logger.error('Database queryOne error', {
+            text,
+            params,
+            error: err,
+            duration: Date.now() - start
+          });
           throw err;
         }
       },
       
       execute: async (text, params) => {
+        const start = Date.now();
         try {
           const result = await pool.query(text, params);
+          logger.info('DB execute success', {
+            text,
+            params,
+            duration: Date.now() - start,
+            rowCount: result.rowCount
+          });
           return {
             rowCount: result.rowCount,
             rows: result.rows
           };
         } catch (err) {
-          console.error('Database execute error:', err);
+          logger.error('Database execute error', {
+            text,
+            params,
+            error: err,
+            duration: Date.now() - start
+          });
           throw err;
         }
       },
@@ -116,11 +151,14 @@ function initializeDatabase() {
         const client = await pool.connect();
         try {
           await client.query('BEGIN');
+          const start = Date.now();
           const result = await callback(client);
           await client.query('COMMIT');
+          logger.info('DB transaction committed', { duration: Date.now() - start });
           return result;
         } catch (e) {
           await client.query('ROLLBACK');
+          logger.error('DB transaction rolled back', { error: e });
           throw e;
         } finally {
           client.release();
@@ -130,7 +168,7 @@ function initializeDatabase() {
       // Close the pool
       close: async () => {
         await pool.end();
-        console.log('PostgreSQL pool has ended');
+        logger.info('PostgreSQL pool has ended');
       }
     };
     
@@ -141,44 +179,77 @@ function initializeDatabase() {
         verbose: process.env.SQLITE_VERBOSE === 'true' ? console.log : null 
       });
       
-      console.log(`SQLite database connected at ${SQLITE_PATH}`);
+      logger.info('SQLite database connected', { path: SQLITE_PATH });
       
       // Create a query interface that mimics the PostgreSQL one
       db = {
         query: (text, params = []) => {
+          const start = Date.now();
           try {
             // Convert $1, $2, etc. to ?, ? for SQLite
             const sqliteText = text.replace(/\$\d+/g, '?');
             const stmt = sqlite.prepare(sqliteText);
-            return stmt.all(params);
+            const rows = stmt.all(params);
+            logger.info('SQLite query success', {
+              text,
+              params,
+              duration: Date.now() - start
+            });
+            return rows;
           } catch (err) {
-            console.error('SQLite query error:', err);
+            logger.error('SQLite query error', {
+              text,
+              params,
+              error: err
+            });
             throw err;
           }
         },
         
         queryOne: (text, params = []) => {
+          const start = Date.now();
           try {
             const sqliteText = text.replace(/\$\d+/g, '?');
             const stmt = sqlite.prepare(sqliteText);
-            return stmt.get(params) || null;
+            const row = stmt.get(params) || null;
+            logger.info('SQLite queryOne success', {
+              text,
+              params,
+              duration: Date.now() - start
+            });
+            return row;
           } catch (err) {
-            console.error('SQLite queryOne error:', err);
+            logger.error('SQLite queryOne error', {
+              text,
+              params,
+              error: err
+            });
             throw err;
           }
         },
         
         execute: (text, params = []) => {
+          const start = Date.now();
           try {
             const sqliteText = text.replace(/\$\d+/g, '?');
             const stmt = sqlite.prepare(sqliteText);
             const info = stmt.run(params);
+            logger.info('SQLite execute success', {
+              text,
+              params,
+              rowCount: info.changes,
+              duration: Date.now() - start
+            });
             return {
               rowCount: info.changes,
               lastInsertRowid: info.lastInsertRowid
             };
           } catch (err) {
-            console.error('SQLite execute error:', err);
+            logger.error('SQLite execute error', {
+              text,
+              params,
+              error: err
+            });
             throw err;
           }
         },
@@ -187,11 +258,14 @@ function initializeDatabase() {
         transaction: (callback) => {
           try {
             sqlite.exec('BEGIN');
+            const start = Date.now();
             const result = callback(sqlite);
             sqlite.exec('COMMIT');
+            logger.info('SQLite transaction committed', { duration: Date.now() - start });
             return result;
           } catch (e) {
             sqlite.exec('ROLLBACK');
+            logger.error('SQLite transaction rolled back', { error: e });
             throw e;
           }
         },
@@ -199,12 +273,12 @@ function initializeDatabase() {
         // Close the database
         close: () => {
           sqlite.close();
-          console.log('SQLite database connection closed');
+          logger.info('SQLite database connection closed');
         }
       };
       
     } catch (err) {
-      console.error('SQLite connection error:', err);
+      logger.error('SQLite connection error', { error: err });
       throw err;
     }
   }

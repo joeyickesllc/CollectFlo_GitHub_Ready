@@ -30,7 +30,7 @@ module.exports = {
   // Ignore node_modules by default
   ignore: [
     'node_modules'
-  ],
-  // Cache babel transformations for faster test runs
-  cache: true
+  ]
+  // Note: Babel no longer supports the `cache` option in configuration files.
+  // Jest handles transform caching internally, so we don't need it here.
 };
