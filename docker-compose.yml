@@ -1,0 +1,110 @@
+version: '3.8'
+
+services:
+  # CollectFlo Node.js application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: collectflo-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=postgres://collectflo:${DB_PASSWORD:-collectflo}@postgres:5432/collectflo
+      - DATABASE_SSL=false
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PREFIX=collectflo
+      - SESSION_SECRET=${SESSION_SECRET:-change-me-in-production}
+      - SESSION_MAX_AGE=86400000
+      - JOB_MAX_RETRIES=3
+      - JOB_RETRY_DELAY=60000
+      - JOB_TIMEOUT=300000
+      - JOB_CONCURRENCY=5
+      - TZ=UTC
+    volumes:
+      - app-logs:/app/logs
+      - app-uploads:/app/uploads
+    networks:
+      - collectflo-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # PostgreSQL database
+  postgres:
+    image: postgres:14-alpine
+    container_name: collectflo-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=collectflo
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-collectflo}
+      - POSTGRES_DB=collectflo
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./db/neon-ready.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - collectflo-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U collectflo"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Redis for job queue and session storage
+  redis:
+    image: redis:7-alpine
+    container_name: collectflo-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - collectflo-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Adminer for database management (optional, development only)
+  adminer:
+    image: adminer
+    container_name: collectflo-adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    environment:
+      - ADMINER_DEFAULT_SERVER=postgres
+    networks:
+      - collectflo-network
+    profiles:
+      - dev
+
+networks:
+  collectflo-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  app-logs:
+  app-uploads:
