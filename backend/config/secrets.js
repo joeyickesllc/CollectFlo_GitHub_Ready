@@ -37,9 +37,10 @@ const secrets = {
 
   // Database Configuration
   database: {
-    type: getSecret('DB_TYPE', false) || (NODE_ENV === 'production' ? 'postgres' : 'sqlite'),
-    postgresUrl: getSecret('DATABASE_URL', false), // Only required if DB_TYPE is postgres
-    sqlitePath: getSecret('SQLITE_PATH', false) || './data/collectflo.db',
+    // CollectFlo now uses PostgreSQL exclusively in every environment.
+    // `DATABASE_URL` **must** be supplied (Render provides this automatically).
+    url: getSecret('DATABASE_URL'),          // e.g. postgres://user:pass@host:5432/dbname
+    ssl: getSecret('DATABASE_SSL', false),   // 'true' or 'false' – optional
   },
 
   // Redis Configuration (for job queue and session store)
