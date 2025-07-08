@@ -2,7 +2,7 @@
  * Database Connection Module
  * 
  * Provides a unified interface for database connections, supporting both
- * PostgreSQL (production) and SQLite (development) databases.
+ * PostgreSQL (production) and SQLite (development/test) databases.
  * 
  * Usage:
  * const db = require('./db/connection');
@@ -20,15 +20,57 @@ const logger = require('../services/logger'); // <— centralized Winston logger
 
 // Environment configuration
 const NODE_ENV = process.env.NODE_ENV || 'development';
-const DB_TYPE = process.env.DB_TYPE || (NODE_ENV === 'production' ? 'postgres' : 'sqlite');
+const IS_PRODUCTION = NODE_ENV === 'production';
+const IS_RENDER = process.env.RENDER === 'true';
+
+// Determine database type with strong preference for PostgreSQL in production
+// Force PostgreSQL if:
+// 1. We're in production environment
+// 2. We're on Render
+// 3. DB_TYPE is explicitly set to 'postgres'
+let DB_TYPE = process.env.DB_TYPE;
+if (!DB_TYPE) {
+  if (IS_PRODUCTION || IS_RENDER) {
+    DB_TYPE = 'postgres';
+  } else {
+    DB_TYPE = 'sqlite';
+  }
+}
+
+// Log the database configuration
+logger.info('Database configuration', {
+  environment: NODE_ENV,
+  databaseType: DB_TYPE,
+  isProduction: IS_PRODUCTION,
+  isRender: IS_RENDER
+});
+
 const DATABASE_URL = process.env.DATABASE_URL;
 const SQLITE_PATH = process.env.SQLITE_PATH || path.join(__dirname, '../../data/collectflo.db');
 
-// Ensure data directory exists for SQLite
+// Validate required configuration for PostgreSQL
+if (DB_TYPE === 'postgres' && !DATABASE_URL) {
+  const error = new Error('DATABASE_URL environment variable is required when using PostgreSQL');
+  logger.error('Missing DATABASE_URL for PostgreSQL connection', { error });
+  throw error;
+}
+
+// Ensure data directory exists for SQLite (only in development)
 if (DB_TYPE === 'sqlite') {
+  if (IS_PRODUCTION) {
+    const error = new Error('SQLite is not supported in production. Please configure PostgreSQL.');
+    logger.error('Attempted to use SQLite in production', { error });
+    throw error;
+  }
+  
   const dataDir = path.dirname(SQLITE_PATH);
   if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
+    try {
+      fs.mkdirSync(dataDir, { recursive: true });
+    } catch (err) {
+      logger.error('Failed to create SQLite data directory', { path: dataDir, error: err });
+      throw err;
+    }
   }
 }
 
@@ -51,17 +93,39 @@ const pgConfig = {
  */
 function initializeDatabase() {
   if (DB_TYPE === 'postgres') {
+    logger.info('Initializing PostgreSQL connection', { 
+      ssl: process.env.DATABASE_SSL === 'true',
+      maxConnections: pgConfig.max
+    });
+    
     // PostgreSQL connection
     const pool = new Pool(pgConfig);
     
     // Test the connection
     pool.query('SELECT NOW()')
-      .then(() => logger.info('PostgreSQL database connected'))
-      .catch(err => logger.error('PostgreSQL connection error', { error: err }));
+      .then(() => logger.info('PostgreSQL database connected successfully'))
+      .catch(err => {
+        logger.error('PostgreSQL connection error', { 
+          error: err,
+          connectionString: DATABASE_URL ? DATABASE_URL.replace(/:[^:@]*@/, ':***@') : undefined, // Mask password
+          ssl: pgConfig.ssl
+        });
+        
+        // In production, we should fail fast if we can't connect to the database
+        if (IS_PRODUCTION || IS_RENDER) {
+          process.exit(1);
+        }
+      });
       
     // Handle pool errors
     pool.on('error', (err) => {
       logger.error('Unexpected PostgreSQL pool error', { error: err });
+      
+      // In production, unexpected pool errors are critical
+      if (IS_PRODUCTION || IS_RENDER) {
+        logger.error('Critical database error in production, exiting process');
+        process.exit(1);
+      }
     });
     
     // Create a query function that works with promises
@@ -173,7 +237,9 @@ function initializeDatabase() {
     };
     
   } else {
-    // SQLite connection
+    // SQLite connection (only for development/test)
+    logger.info('Initializing SQLite connection', { path: SQLITE_PATH });
+    
     try {
       const sqlite = new BetterSqlite3(SQLITE_PATH, { 
         verbose: process.env.SQLITE_VERBOSE === 'true' ? console.log : null 
@@ -278,7 +344,7 @@ function initializeDatabase() {
       };
       
     } catch (err) {
-      logger.error('SQLite connection error', { error: err });
+      logger.error('SQLite connection error', { error: err, path: SQLITE_PATH });
       throw err;
     }
   }
