@@ -10,7 +10,7 @@
 // Destructure `default` to keep the `migrate` identifier unchanged.
 const { default: migrate } = require('node-pg-migrate');
 const path = require('path');
-const fs   = require('fs');
+const fs = require('fs');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') }); // Load .env from root
 const logger = require('../services/logger'); // Our centralized logger
 
@@ -21,54 +21,38 @@ const logger = require('../services/logger'); // Our centralized logger
 async function runMigrations() {
   const NODE_ENV = process.env.NODE_ENV || 'development';
   const DATABASE_URL = process.env.DATABASE_URL;
+  
   // In production / Render we default to true unless explicitly disabled
   const DATABASE_SSL =
     process.env.DATABASE_SSL === 'true' ||
     (NODE_ENV === 'production' && process.env.DATABASE_SSL !== 'false');
 
-  // Helper to log fatal config errors and exit
-  const logAndExit = (msg) => {
-    logger.error(`[MIGRATION] ${msg}`);
-    process.exit(1);
-  };
-
-  // ------------------------------------------------------------------
-  // 1. Validate DATABASE_URL
-  // ------------------------------------------------------------------
+  // Simple check if DATABASE_URL is provided - no validation of format
   if (!DATABASE_URL) {
-    logAndExit('DATABASE_URL environment variable is not set. Cannot run migrations.');
+    logger.error('[MIGRATION] DATABASE_URL environment variable is not set. Cannot run migrations.');
+    process.exit(1);
   }
 
-  // Very simple Postgres URL validator
-  let parsed;
-  try {
-    parsed = new URL(DATABASE_URL);
-  } catch (err) {
-    logAndExit(`Invalid DATABASE_URL "${DATABASE_URL}". Cannot parse URL.`);
+  // Log database configuration
+  logger.info('[MIGRATION] Running migrations with configuration', {
+    environment: NODE_ENV,
+    ssl: DATABASE_SSL,
+    // Mask password in logs for security
+    databaseUrl: DATABASE_URL.replace(/:[^:@]*@/, ':***@')
+  });
+
+  // Check migrations directory exists
+  const migrationsDir = path.resolve(__dirname, '../../db/migrations');
+  if (!fs.existsSync(migrationsDir)) {
+    logger.error(`[MIGRATION] Migrations directory "${migrationsDir}" does not exist.`);
+    process.exit(1);
   }
 
-  // Accept both postgres:// and postgresql:// schemes and allow optional port.
-  if (
-    parsed.protocol !== 'postgres:' &&
-    parsed.protocol !== 'postgresql:'
-  ) {
-    logAndExit(
-      `Invalid DATABASE_URL "${DATABASE_URL}". Protocol must be postgres:// or postgresql://`
-    );
-  }
-
+  // Configure database connection and migrations
   const dbConfig = {
     connectionString: DATABASE_URL,
     ssl: DATABASE_SSL ? { rejectUnauthorized: false } : false,
   };
-
-  // ------------------------------------------------------------------
-  // 2. Validate migrations directory
-  // ------------------------------------------------------------------
-  const migrationsDir = path.resolve(__dirname, '../../db/migrations');
-  if (!fs.existsSync(migrationsDir)) {
-    logAndExit(`Migrations directory "${migrationsDir}" does not exist.`);
-  }
 
   const migrationOptions = {
     databaseUrl: dbConfig,
@@ -85,24 +69,24 @@ async function runMigrations() {
   };
 
   try {
-    logger.info('Starting database migrations...');
+    logger.info('[MIGRATION] Starting database migrations...');
     // `migrate` returns an array of executed migration names
     const migrated = await migrate(migrationOptions);
 
     if (migrated.length > 0) {
-      logger.info(`Successfully ran ${migrated.length} migrations: ${migrated.join(', ')}`);
+      logger.info(`[MIGRATION] Successfully ran ${migrated.length} migrations: ${migrated.join(', ')}`);
     } else {
-      logger.info('No new database migrations to run.');
+      logger.info('[MIGRATION] No new database migrations to run.');
     }
     return true;
   } catch (error) {
     // Provide as much detail as possible for troubleshooting
-    logger.error('Database migration failed!', {
+    logger.error('[MIGRATION] Database migration failed!', {
       message: error.message,
-      stack:   error.stack,
-      detail:  error.detail,      // node-pg specific
-      hint:    error.hint,        // node-pg specific
-      code:    error.code
+      stack: error.stack,
+      detail: error.detail,      // node-pg specific
+      hint: error.hint,        // node-pg specific
+      code: error.code
     });
     // In a real application, you might want to exit the process or take other recovery actions
     throw error; // Re-throw to allow the calling process (e.g., index.js) to handle it
