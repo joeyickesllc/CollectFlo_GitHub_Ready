@@ -1,21 +1,18 @@
 /**
- * 1689000000000_initial-schema.js
+ * 1689000000000_initial-schema.js.simple
  *
- * Initial database schema for the CollectFlo application.
+ * Simplified initial database schema for the CollectFlo application.
+ * Uses BIGSERIAL IDs instead of UUIDs to avoid dependency on extensions.
  * Sets up tables for users, companies, invoices, follow-ups,
  * message templates, settings, and error logs.
  */
 
 exports.up = async (pgm) => {
-  // Enable UUID extension if not already enabled
-  pgm.createExtension('uuid-ossp', { ifNotExists: true });
-
   // 1. Companies Table
   pgm.createTable('companies', {
     id: {
-      type: 'UUID',
+      type: 'BIGSERIAL',
       primaryKey: true,
-      default: pgm.func('uuid_generate_v4()'),
     },
     name: {
       type: 'VARCHAR(255)',
@@ -41,9 +38,8 @@ exports.up = async (pgm) => {
   // 2. Users Table
   pgm.createTable('users', {
     id: {
-      type: 'UUID',
+      type: 'BIGSERIAL',
       primaryKey: true,
-      default: pgm.func('uuid_generate_v4()'),
     },
     name: {
       type: 'VARCHAR(255)',
@@ -59,9 +55,9 @@ exports.up = async (pgm) => {
       notNull: true,
     },
     company_id: {
-      type: 'UUID',
+      type: 'BIGINT',
       notNull: true,
-      references: 'companies',
+      references: '"companies" (id)',
       onDelete: 'CASCADE',
     },
     role: {
@@ -87,8 +83,6 @@ exports.up = async (pgm) => {
   });
 
   // 3. Sessions Table (for express-session if using a database store)
-  // Note: If using Redis for sessions, this table might not be needed.
-  // Including for completeness as a common pattern.
   pgm.createTable('sessions', {
     sid: {
       type: 'VARCHAR(255)',
@@ -107,15 +101,14 @@ exports.up = async (pgm) => {
   // 4. Settings Table (for company-specific configurations)
   pgm.createTable('settings', {
     id: {
-      type: 'UUID',
+      type: 'BIGSERIAL',
       primaryKey: true,
-      default: pgm.func('uuid_generate_v4()'),
     },
     company_id: {
-      type: 'UUID',
+      type: 'BIGINT',
       notNull: true,
       unique: true, // One settings entry per company
-      references: 'companies',
+      references: '"companies" (id)',
       onDelete: 'CASCADE',
     },
     qbo_access_token: {
@@ -133,7 +126,6 @@ exports.up = async (pgm) => {
     logo_url: {
       type: 'TEXT',
     },
-    // Add other settings as needed (e.g., default email sender, etc.)
     created_at: {
       type: 'TIMESTAMPTZ',
       notNull: true,
@@ -149,13 +141,12 @@ exports.up = async (pgm) => {
   // 5. Message Templates Table
   pgm.createTable('message_templates', {
     id: {
-      type: 'UUID',
+      type: 'BIGSERIAL',
       primaryKey: true,
-      default: pgm.func('uuid_generate_v4()'),
     },
     company_id: {
-      type: 'UUID',
-      references: 'companies',
+      type: 'BIGINT',
+      references: '"companies" (id)',
       onDelete: 'CASCADE',
       // Nullable if it's a global template
     },
@@ -198,14 +189,13 @@ exports.up = async (pgm) => {
   // 6. Invoices Table
   pgm.createTable('invoices', {
     id: {
-      type: 'UUID',
+      type: 'BIGSERIAL',
       primaryKey: true,
-      default: pgm.func('uuid_generate_v4()'),
     },
     company_id: {
-      type: 'UUID',
+      type: 'BIGINT',
       notNull: true,
-      references: 'companies',
+      references: '"companies" (id)',
       onDelete: 'CASCADE',
     },
     qbo_invoice_id: {
@@ -261,14 +251,13 @@ exports.up = async (pgm) => {
   // 7. Invoice Follow-ups Table
   pgm.createTable('invoice_followups', {
     id: {
-      type: 'UUID',
+      type: 'BIGSERIAL',
       primaryKey: true,
-      default: pgm.func('uuid_generate_v4()'),
     },
     invoice_id: {
-      type: 'UUID',
+      type: 'BIGINT',
       notNull: true,
-      references: 'invoices',
+      references: '"invoices" (id)',
       onDelete: 'CASCADE',
     },
     type: {
@@ -276,8 +265,8 @@ exports.up = async (pgm) => {
       notNull: true,
     },
     template_id: {
-      type: 'UUID',
-      references: 'message_templates',
+      type: 'BIGINT',
+      references: '"message_templates" (id)',
       onDelete: 'SET NULL', // If template is deleted, keep record but nullify template_id
     },
     sent_at: {
@@ -303,9 +292,8 @@ exports.up = async (pgm) => {
   // 8. Error Logs Table
   pgm.createTable('error_logs', {
     id: {
-      type: 'UUID',
+      type: 'BIGSERIAL',
       primaryKey: true,
-      default: pgm.func('uuid_generate_v4()'),
     },
     level: {
       type: 'VARCHAR(50)', // 'error', 'warn', 'info', 'debug'
@@ -331,13 +319,12 @@ exports.up = async (pgm) => {
   // 9. User Activity Log (for beta stats and general user tracking)
   pgm.createTable('user_activity', {
     id: {
-      type: 'UUID',
+      type: 'BIGSERIAL',
       primaryKey: true,
-      default: pgm.func('uuid_generate_v4()'),
     },
     user_id: {
-      type: 'UUID',
-      references: 'users',
+      type: 'BIGINT',
+      references: '"users" (id)',
       onDelete: 'CASCADE',
     },
     activity_type: {
@@ -366,8 +353,4 @@ exports.down = async (pgm) => {
   pgm.dropTable('sessions');
   pgm.dropTable('users');
   pgm.dropTable('companies');
-
-  // Drop UUID extension if it was created by this migration and no longer needed
-  // This might be too aggressive if other parts of the app use it.
-  // pgm.dropExtension('uuid-ossp', { ifExists: true });
 };
