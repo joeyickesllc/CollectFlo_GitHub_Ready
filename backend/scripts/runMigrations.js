@@ -72,6 +72,7 @@ async function runMigrations() {
 
   try {
     logger.info('Starting database migrations...');
+    // `migrate` returns an array of executed migration names
     const migrated = await migrate(migrationOptions);
 
     if (migrated.length > 0) {
