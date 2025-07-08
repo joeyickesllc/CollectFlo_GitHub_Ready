@@ -6,7 +6,9 @@
  * to ensure the database schema is up-to-date.
  */
 
-const migrate = require('node-pg-migrate');
+// node-pg-migrate exposes its programmatic API as the module's default export.
+// Destructure `default` to keep the `migrate` identifier unchanged.
+const { default: migrate } = require('node-pg-migrate');
 const path = require('path');
 const fs   = require('fs');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') }); // Load .env from root
