@@ -13,29 +13,14 @@
 
 require('dotenv').config();
 const { Pool } = require('pg');
-const BetterSqlite3 = require('better-sqlite3');
-const path = require('path');
-const fs = require('fs');
 const logger = require('../services/logger'); // <— centralized Winston logger
 
 // Environment configuration
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const IS_PRODUCTION = NODE_ENV === 'production';
 const IS_RENDER = process.env.RENDER === 'true';
-
-// Determine database type with strong preference for PostgreSQL in production
-// Force PostgreSQL if:
-// 1. We're in production environment
-// 2. We're on Render
-// 3. DB_TYPE is explicitly set to 'postgres'
-let DB_TYPE = process.env.DB_TYPE;
-if (!DB_TYPE) {
-  if (IS_PRODUCTION || IS_RENDER) {
-    DB_TYPE = 'postgres';
-  } else {
-    DB_TYPE = 'sqlite';
-  }
-}
+// Force PostgreSQL in every environment
+const DB_TYPE = 'postgres';
 
 // Log the database configuration
 logger.info('Database configuration', {
@@ -46,32 +31,12 @@ logger.info('Database configuration', {
 });
 
 const DATABASE_URL = process.env.DATABASE_URL;
-const SQLITE_PATH = process.env.SQLITE_PATH || path.join(__dirname, '../../data/collectflo.db');
 
 // Validate required configuration for PostgreSQL
 if (DB_TYPE === 'postgres' && !DATABASE_URL) {
   const error = new Error('DATABASE_URL environment variable is required when using PostgreSQL');
   logger.error('Missing DATABASE_URL for PostgreSQL connection', { error });
   throw error;
-}
-
-// Ensure data directory exists for SQLite (only in development)
-if (DB_TYPE === 'sqlite') {
-  if (IS_PRODUCTION) {
-    const error = new Error('SQLite is not supported in production. Please configure PostgreSQL.');
-    logger.error('Attempted to use SQLite in production', { error });
-    throw error;
-  }
-  
-  const dataDir = path.dirname(SQLITE_PATH);
-  if (!fs.existsSync(dataDir)) {
-    try {
-      fs.mkdirSync(dataDir, { recursive: true });
-    } catch (err) {
-      logger.error('Failed to create SQLite data directory', { path: dataDir, error: err });
-      throw err;
-    }
-  }
 }
 
 // Database connection object
@@ -92,7 +57,7 @@ const pgConfig = {
  * Initialize the database connection based on the environment
  */
 function initializeDatabase() {
-  if (DB_TYPE === 'postgres') {
+  // PostgreSQL only
     logger.info('Initializing PostgreSQL connection', { 
       ssl: process.env.DATABASE_SSL === 'true',
       maxConnections: pgConfig.max
@@ -235,119 +200,6 @@ function initializeDatabase() {
         logger.info('PostgreSQL pool has ended');
       }
     };
-    
-  } else {
-    // SQLite connection (only for development/test)
-    logger.info('Initializing SQLite connection', { path: SQLITE_PATH });
-    
-    try {
-      const sqlite = new BetterSqlite3(SQLITE_PATH, { 
-        verbose: process.env.SQLITE_VERBOSE === 'true' ? console.log : null 
-      });
-      
-      logger.info('SQLite database connected', { path: SQLITE_PATH });
-      
-      // Create a query interface that mimics the PostgreSQL one
-      db = {
-        query: (text, params = []) => {
-          const start = Date.now();
-          try {
-            // Convert $1, $2, etc. to ?, ? for SQLite
-            const sqliteText = text.replace(/\$\d+/g, '?');
-            const stmt = sqlite.prepare(sqliteText);
-            const rows = stmt.all(params);
-            logger.info('SQLite query success', {
-              text,
-              params,
-              duration: Date.now() - start
-            });
-            return rows;
-          } catch (err) {
-            logger.error('SQLite query error', {
-              text,
-              params,
-              error: err
-            });
-            throw err;
-          }
-        },
-        
-        queryOne: (text, params = []) => {
-          const start = Date.now();
-          try {
-            const sqliteText = text.replace(/\$\d+/g, '?');
-            const stmt = sqlite.prepare(sqliteText);
-            const row = stmt.get(params) || null;
-            logger.info('SQLite queryOne success', {
-              text,
-              params,
-              duration: Date.now() - start
-            });
-            return row;
-          } catch (err) {
-            logger.error('SQLite queryOne error', {
-              text,
-              params,
-              error: err
-            });
-            throw err;
-          }
-        },
-        
-        execute: (text, params = []) => {
-          const start = Date.now();
-          try {
-            const sqliteText = text.replace(/\$\d+/g, '?');
-            const stmt = sqlite.prepare(sqliteText);
-            const info = stmt.run(params);
-            logger.info('SQLite execute success', {
-              text,
-              params,
-              rowCount: info.changes,
-              duration: Date.now() - start
-            });
-            return {
-              rowCount: info.changes,
-              lastInsertRowid: info.lastInsertRowid
-            };
-          } catch (err) {
-            logger.error('SQLite execute error', {
-              text,
-              params,
-              error: err
-            });
-            throw err;
-          }
-        },
-        
-        // Transaction helper for SQLite
-        transaction: (callback) => {
-          try {
-            sqlite.exec('BEGIN');
-            const start = Date.now();
-            const result = callback(sqlite);
-            sqlite.exec('COMMIT');
-            logger.info('SQLite transaction committed', { duration: Date.now() - start });
-            return result;
-          } catch (e) {
-            sqlite.exec('ROLLBACK');
-            logger.error('SQLite transaction rolled back', { error: e });
-            throw e;
-          }
-        },
-        
-        // Close the database
-        close: () => {
-          sqlite.close();
-          logger.info('SQLite database connection closed');
-        }
-      };
-      
-    } catch (err) {
-      logger.error('SQLite connection error', { error: err, path: SQLITE_PATH });
-      throw err;
-    }
-  }
 }
 
 // Initialize the database connection

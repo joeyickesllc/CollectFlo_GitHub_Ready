@@ -18,10 +18,26 @@ const logger = require('../services/logger'); // Our centralized logger
 async function runMigrations() {
   const NODE_ENV = process.env.NODE_ENV || 'development';
   const DATABASE_URL = process.env.DATABASE_URL;
-  const DATABASE_SSL = process.env.DATABASE_SSL === 'true';
+  // In production / Render we default to true unless explicitly disabled
+  const DATABASE_SSL =
+    process.env.DATABASE_SSL === 'true' ||
+    (NODE_ENV === 'production' && process.env.DATABASE_SSL !== 'false');
 
+  /**
+   * Basic validation – we only support PostgreSQL so the scheme
+   * must begin with postgres:// or postgresql://
+   */
   if (!DATABASE_URL) {
-    logger.error('DATABASE_URL environment variable is not set. Cannot run migrations.');
+    logger.error(
+      'DATABASE_URL environment variable is not set. Cannot run migrations.'
+    );
+    process.exit(1);
+  }
+  const lowerUrl = DATABASE_URL.toLowerCase();
+  if (!lowerUrl.startsWith('postgres://') && !lowerUrl.startsWith('postgresql://')) {
+    logger.error(
+      `Invalid DATABASE_URL "${DATABASE_URL}". Only PostgreSQL connection strings are supported.`
+    );
     process.exit(1);
   }
 
