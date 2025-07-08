@@ -30,6 +30,16 @@ const jobQueue = require('./backend/services/jobQueue');
 // Migration runner
 const runMigrations = require('./backend/scripts/runMigrations');
 
+// ---------------------------------------------------------------------------
+// Redis / Job-Queue mode check
+// ---------------------------------------------------------------------------
+if (jobQueue.usingMockImplementation) {
+  logger.warn(
+    'Redis is not available – job queues running in in-memory fallback mode. ' +
+    'Jobs will NOT persist across restarts.'
+  );
+}
+
 // Environment variables
 const PORT = process.env.PORT || 3000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -169,7 +179,13 @@ async function bootstrap() {
     });
 
     // Initialize scheduled jobs only after successful start
-    require('./services/scheduler');
+    try {
+      require('./services/scheduler');
+      logger.info('Scheduler initialised successfully');
+    } catch (schedErr) {
+      logger.error('Scheduler failed to initialise', { error: schedErr });
+      // Do NOT crash the whole app – core API can still function without scheduler
+    }
   } catch (error) {
     logger.error('Failed to start application due to startup error', { error });
     process.exit(1); // Exit with failure so Render restarts / reports the issue
@@ -196,10 +212,18 @@ async function gracefulShutdown() {
   
   try {
     // Shutdown job queues
-    await jobQueue.shutdown();
-    
+    try {
+      await jobQueue.shutdown();
+    } catch (jqErr) {
+      logger.error('Error shutting down job queues', { error: jqErr });
+    }
+
     // Close database connections
-    await db.close();
+    try {
+      await db.close();
+    } catch (dbErr) {
+      logger.error('Error closing database connections', { error: dbErr });
+    }
     
     logger.info('Graceful shutdown completed');
     process.exit(0);
