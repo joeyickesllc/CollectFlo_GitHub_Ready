@@ -40,9 +40,21 @@ async function runMigrations() {
   }
 
   // Very simple Postgres URL validator
-  const POSTGRES_URL_REGEX = /^(postgres(ql)?):\/\/[^:]+:[^@]+@[^:]+:\d+\/.+$/i;
-  if (!POSTGRES_URL_REGEX.test(DATABASE_URL)) {
-    logAndExit(`Invalid DATABASE_URL "${DATABASE_URL}". It must be a valid PostgreSQL connection string.`);
+  let parsed;
+  try {
+    parsed = new URL(DATABASE_URL);
+  } catch (err) {
+    logAndExit(`Invalid DATABASE_URL "${DATABASE_URL}". Cannot parse URL.`);
+  }
+
+  // Accept both postgres:// and postgresql:// schemes and allow optional port.
+  if (
+    parsed.protocol !== 'postgres:' &&
+    parsed.protocol !== 'postgresql:'
+  ) {
+    logAndExit(
+      `Invalid DATABASE_URL "${DATABASE_URL}". Protocol must be postgres:// or postgresql://`
+    );
   }
 
   const dbConfig = {

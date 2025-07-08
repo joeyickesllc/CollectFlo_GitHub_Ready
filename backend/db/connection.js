@@ -30,14 +30,63 @@ logger.info('Database configuration', {
   isRender: IS_RENDER
 });
 
-const DATABASE_URL = process.env.DATABASE_URL;
+/**
+ * ---------------------------------------------------------------------------
+ * Validate & Normalise DATABASE_URL
+ * ---------------------------------------------------------------------------
+ * Render supplies URLs that start with **postgresql://** while many libraries
+ * still emit **postgres://**.  Both are valid — accept either form.
+ */
+
+const DATABASE_URL_RAW = process.env.DATABASE_URL;
+let DATABASE_URL;
+
+try {
+  if (!DATABASE_URL_RAW) {
+    throw new Error('DATABASE_URL environment variable is not set');
+  }
+
+  const parsed = new URL(DATABASE_URL_RAW);
+
+  // Accept both postgres:// and postgresql:// schemes
+  if (parsed.protocol !== 'postgres:' && parsed.protocol !== 'postgresql:') {
+    throw new Error(
+      `Unsupported DATABASE_URL protocol "${parsed.protocol}". ` +
+      'Must be postgres:// or postgresql://'
+    );
+  }
+
+  // Normalise to postgres:// (pg library is fine with either, but keep it tidy)
+  if (parsed.protocol === 'postgresql:') {
+    parsed.protocol = 'postgres:';
+    DATABASE_URL = parsed.toString();
+  } else {
+    DATABASE_URL = DATABASE_URL_RAW;
+  }
+} catch (err) {
+  logger.error('Invalid DATABASE_URL', { error: err });
+  throw err;
+}
 
 // Validate required configuration for PostgreSQL
+// (Redundant after the check above, but keep for clarity)
 if (DB_TYPE === 'postgres' && !DATABASE_URL) {
   const error = new Error('DATABASE_URL environment variable is required when using PostgreSQL');
   logger.error('Missing DATABASE_URL for PostgreSQL connection', { error });
   throw error;
 }
+
+/**
+ * ---------------------------------------------------------------------------
+ * SSL Configuration
+ * ---------------------------------------------------------------------------
+ * Render Postgres requires SSL.  Enable it automatically in production / Render
+ * unless the user explicitly disables it by setting DATABASE_SSL=false.
+ */
+
+const DATABASE_SSL =
+  process.env.DATABASE_SSL === 'true' ||
+  (process.env.DATABASE_SSL !== 'false' && (IS_PRODUCTION || IS_RENDER));
 
 // Database connection object
 let db;
@@ -45,9 +94,9 @@ let db;
 // PostgreSQL connection pool configuration
 const pgConfig = {
   connectionString: DATABASE_URL,
-  ssl: process.env.DATABASE_SSL === 'true' ? 
-    { rejectUnauthorized: false } : 
-    false,
+  ssl: DATABASE_SSL
+    ? { rejectUnauthorized: false }
+    : false,
   max: parseInt(process.env.PG_MAX_CONNECTIONS || '10'),
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
