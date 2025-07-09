@@ -11,7 +11,7 @@
  * especially important for production deployments on Render.
  */
 
-const { body, validationResult } = require('express-validator');
+const { body, validationResult, oneOf } = require('express-validator');
 const rateLimit = require('express-rate-limit');
 const xssClean = require('xss-clean');
 const helmet = require('helmet');
@@ -132,11 +132,27 @@ exports.validateSignup = [
     .isLength({ min: 2 }).withMessage('Name must be at least 2 characters long')
     .escape(),
   
-  body(['companyName', 'company_name'])
-    .if(body('companyName').exists().or(body('company_name').exists()))
-    .trim()
-    .isLength({ min: 2 }).withMessage('Company name must be at least 2 characters long')
-    .escape(),
+  /*
+   * Company name validation:
+   * Accepts either `companyName` (camelCase) or `company_name` (snake_case).
+   * The rule passes when at least one of the fields exists and meets length
+   * requirements. Using oneOf() avoids the invalid `.or()` chain that caused
+   * the TypeError.
+   */
+  oneOf([
+    body('companyName')
+      .exists().withMessage('Company name is required')
+      .bail()
+      .isLength({ min: 2 }).withMessage('Company name must be at least 2 characters long')
+      .trim()
+      .escape(),
+    body('company_name')
+      .exists().withMessage('Company name is required')
+      .bail()
+      .isLength({ min: 2 }).withMessage('Company name must be at least 2 characters long')
+      .trim()
+      .escape()
+  ]),
   
   // Validation middleware handler
   (req, res, next) => {
