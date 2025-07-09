@@ -22,6 +22,8 @@ const jobQueue = require('./backend/services/jobQueue');
 
 // Migration runner
 const runMigrations = require('./backend/scripts/runMigrations');
+// Tracking middleware
+const { trackPageVisit } = require('./backend/middleware/trackingMiddleware');
 
 // ---------------------------------------------------------------------------
 // Redis / Job-Queue mode check
@@ -101,6 +103,13 @@ app.use(session({
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
+
+// ---------------------------------------------------------------------------
+// Page-visit tracking
+// ---------------------------------------------------------------------------
+// Must be registered BEFORE static file middleware so it only runs once per
+// real page view and not for every asset request.
+app.use(trackPageVisit);
 
 // Configure file uploads
 const upload = multer({
