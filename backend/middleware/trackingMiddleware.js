@@ -1,173 +1,320 @@
 /**
- * Tracking Middleware
+ * User Activity Tracking Middleware
  * 
- * Middleware for tracking user activity and page visits.
- * This data is used to populate the beta statistics dashboard.
+ * This middleware tracks various user activities for analytics purposes:
+ * - Page visits
+ * - Login attempts (successful and failed)
+ * - Beta signups
+ * - Other user actions
+ * 
+ * Data is stored in the user_activity table and used for analytics dashboards
+ * and conversion tracking.
  */
 
 const db = require('../db/connection');
 const logger = require('../services/logger');
 
 /**
- * Track page visit
- * Records when users visit pages, including referrer source and user info
+ * Track page visits
  * 
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next middleware function
+ * Records when users visit pages, including referral source
+ * and user agent information for analytics
  */
-const trackPageVisit = (req, res, next) => {
-  // Skip tracking for API requests, static files, and health checks
+exports.trackPageVisit = async (req, res, next) => {
+  // Skip tracking for asset requests, API calls, and health checks
   if (
-    req.path.startsWith('/api') || 
-    req.path.includes('.') ||
+    req.path.includes('.') || 
+    req.path.startsWith('/api/') || 
     req.path === '/health' ||
-    req.method !== 'GET'
+    req.path === '/favicon.ico'
   ) {
     return next();
   }
 
-  // Capture the request asynchronously to avoid blocking
-  setTimeout(async () => {
-    try {
-      // Extract user information if available
-      const userId = req.session?.user?.id;
-      
-      // Extract request information
-      const url = req.originalUrl || req.url;
-      const referrer = req.headers.referer || req.headers.referrer || 'direct';
-      const userAgent = req.headers['user-agent'];
-      const ipAddress = req.ip || req.connection.remoteAddress;
-      
-      // Determine the source from referrer
-      let source = 'Direct';
-      if (referrer) {
-        if (referrer.includes('google')) source = 'Google';
-        else if (referrer.includes('bing')) source = 'Bing';
-        else if (referrer.includes('yahoo')) source = 'Yahoo';
-        else if (referrer.includes('twitter') || referrer.includes('t.co')) source = 'Twitter';
-        else if (referrer.includes('facebook') || referrer.includes('fb.com')) source = 'Facebook';
-        else if (referrer.includes('linkedin')) source = 'LinkedIn';
-        else if (referrer.includes('producthunt')) source = 'Product Hunt';
-        else if (referrer.includes(req.hostname)) source = 'Internal';
-        else source = 'Other';
-      }
-
-      // Store visit in database
-      await db.query(
-        `INSERT INTO user_activity 
-         (user_id, activity_type, details, created_at) 
-         VALUES ($1, $2, $3, NOW())`,
-        [
-          userId || null,
-          'page_visit',
-          {
-            url,
-            referrer,
-            source,
-            userAgent,
-            ipAddress,
-            timestamp: new Date().toISOString()
-          }
-        ]
-      );
-
-      logger.debug('Page visit tracked', { 
-        url, 
-        source, 
-        userId: userId || 'anonymous' 
-      });
-    } catch (error) {
-      // Don't let tracking errors affect the user experience
-      logger.error('Error tracking page visit', { error });
-    }
-  }, 0);
-
-  // Continue with the request immediately
+  try {
+    const userId = req.session?.user?.id || null;
+    const path = req.path;
+    const referrer = req.get('Referrer') || null;
+    const userAgent = req.get('User-Agent') || null;
+    const source = req.query.source || req.query.utm_source || extractSourceFromReferrer(referrer);
+    
+    // Store activity asynchronously (don't block request)
+    storeActivity({
+      user_id: userId,
+      activity_type: 'page_visit',
+      details: {
+        path,
+        referrer,
+        userAgent,
+        source,
+        query: req.query
+      },
+      ip_address: req.ip
+    }).catch(err => {
+      logger.warn('Failed to track page visit', { error: err, path });
+    });
+  } catch (error) {
+    // Log error but don't interrupt request flow
+    logger.warn('Error in trackPageVisit middleware', { error });
+  }
+  
   next();
 };
 
 /**
- * Track specific user action
- * Records when users perform specific actions like clicking buttons or submitting forms
+ * Track login attempts
  * 
- * @param {String} actionType - Type of action being tracked
- * @param {Object} details - Additional details about the action
- * @returns {Function} Express middleware
+ * Records both successful and failed login attempts
+ * for security monitoring and analytics
  */
-const trackUserAction = (actionType, details = {}) => {
-  return async (req, res, next) => {
-    // Extract user information if available
-    const userId = req.session?.user?.id;
+exports.trackLogin = async (req, res, next) => {
+  // Capture the original send method to intercept the response
+  const originalSend = res.send;
+  
+  res.send = function(data) {
+    // Restore original method to avoid infinite recursion
+    res.send = originalSend;
     
     try {
-      if (!actionType) {
-        throw new Error('Action type is required for tracking');
+      // Parse response data if it's JSON
+      let responseData = data;
+      if (typeof data === 'string') {
+        try {
+          responseData = JSON.parse(data);
+        } catch (e) {
+          // Not JSON, ignore
+        }
       }
-
-      // Combine passed details with request info
-      const actionDetails = {
-        ...details,
-        url: req.originalUrl || req.url,
-        timestamp: new Date().toISOString(),
-        ipAddress: req.ip || req.connection.remoteAddress
-      };
-
-      // If there's form data, include it (but sanitize sensitive fields)
-      if (req.body) {
-        const sanitizedBody = { ...req.body };
-        // Remove sensitive fields
-        delete sanitizedBody.password;
-        delete sanitizedBody.token;
-        delete sanitizedBody.creditCard;
-        
-        actionDetails.formData = sanitizedBody;
-      }
-
-      // Store action in database
-      await db.query(
-        `INSERT INTO user_activity 
-         (user_id, activity_type, details, created_at) 
-         VALUES ($1, $2, $3, NOW())`,
-        [
-          userId || null,
-          actionType,
-          actionDetails
-        ]
-      );
-
-      logger.debug(`User action tracked: ${actionType}`, { 
-        actionType, 
-        userId: userId || 'anonymous' 
+      
+      // Determine if login was successful
+      const isSuccessful = responseData?.success === true;
+      const userId = isSuccessful && req.session?.user?.id ? req.session.user.id : null;
+      const email = req.body?.email;
+      
+      // Store activity asynchronously
+      storeActivity({
+        user_id: userId,
+        activity_type: 'login_attempt',
+        details: {
+          email,
+          success: isSuccessful,
+          userAgent: req.get('User-Agent')
+        },
+        ip_address: req.ip
+      }).catch(err => {
+        logger.warn('Failed to track login attempt', { error: err, email });
       });
     } catch (error) {
-      // Don't let tracking errors affect the user experience
-      logger.error(`Error tracking user action: ${actionType}`, { error });
+      logger.warn('Error in trackLogin middleware', { error });
     }
+    
+    // Call the original method
+    return originalSend.call(this, data);
+  };
+  
+  next();
+};
 
-    // Continue with the request
+/**
+ * Track beta program signups
+ * 
+ * Records when users sign up for the beta program
+ * for conversion tracking and analytics
+ */
+exports.trackBetaSignup = async (req, res, next) => {
+  // Capture the original send method to intercept the response
+  const originalSend = res.send;
+  
+  res.send = function(data) {
+    // Restore original method to avoid infinite recursion
+    res.send = originalSend;
+    
+    try {
+      // Parse response data if it's JSON
+      let responseData = data;
+      if (typeof data === 'string') {
+        try {
+          responseData = JSON.parse(data);
+        } catch (e) {
+          // Not JSON, ignore
+        }
+      }
+      
+      // Determine if signup was successful
+      const isSuccessful = responseData?.success === true;
+      const userId = isSuccessful && responseData?.user?.id ? responseData.user.id : null;
+      const email = req.body?.email;
+      const company = req.body?.company_name || req.body?.companyName;
+      
+      // Store activity asynchronously
+      storeActivity({
+        user_id: userId,
+        activity_type: 'beta_signup',
+        details: {
+          email,
+          company,
+          success: isSuccessful,
+          source: req.query.source || req.query.utm_source || extractSourceFromReferrer(req.get('Referrer'))
+        },
+        ip_address: req.ip
+      }).catch(err => {
+        logger.warn('Failed to track beta signup', { error: err, email });
+      });
+    } catch (error) {
+      logger.warn('Error in trackBetaSignup middleware', { error });
+    }
+    
+    // Call the original method
+    return originalSend.call(this, data);
+  };
+  
+  next();
+};
+
+/**
+ * Generic user action tracker
+ * 
+ * Factory function that creates middleware to track any user action
+ * 
+ * @param {string} actionType - The type of action to track
+ * @param {Function} detailsExtractor - Optional function to extract details from request
+ * @returns {Function} Express middleware
+ */
+exports.trackUserAction = (actionType, detailsExtractor) => {
+  return async (req, res, next) => {
+    // Capture the original send method to intercept the response
+    const originalSend = res.send;
+    
+    res.send = function(data) {
+      // Restore original method to avoid infinite recursion
+      res.send = originalSend;
+      
+      try {
+        // Parse response data if it's JSON
+        let responseData = data;
+        if (typeof data === 'string') {
+          try {
+            responseData = JSON.parse(data);
+          } catch (e) {
+            // Not JSON, ignore
+          }
+        }
+        
+        // Determine if action was successful
+        const isSuccessful = responseData?.success === true;
+        const userId = req.session?.user?.id || (isSuccessful && responseData?.user?.id ? responseData.user.id : null);
+        
+        // Extract details using provided function or default to basic info
+        const details = detailsExtractor 
+          ? detailsExtractor(req, responseData, isSuccessful)
+          : {
+              path: req.path,
+              method: req.method,
+              success: isSuccessful,
+              userAgent: req.get('User-Agent')
+            };
+        
+        // Store activity asynchronously
+        storeActivity({
+          user_id: userId,
+          activity_type: actionType,
+          details,
+          ip_address: req.ip
+        }).catch(err => {
+          logger.warn(`Failed to track user action: ${actionType}`, { error: err });
+        });
+      } catch (error) {
+        logger.warn(`Error in trackUserAction middleware for ${actionType}`, { error });
+      }
+      
+      // Call the original method
+      return originalSend.call(this, data);
+    };
+    
     next();
   };
 };
 
 /**
- * Track beta signup
- * Specialized middleware for tracking beta signups
+ * Store activity in the database
+ * 
+ * @param {Object} activity - Activity data to store
+ * @param {number|null} activity.user_id - User ID or null for anonymous
+ * @param {string} activity.activity_type - Type of activity
+ * @param {Object} activity.details - Activity details
+ * @param {string} activity.ip_address - IP address
+ * @returns {Promise} Database query promise
  */
-const trackBetaSignup = trackUserAction('beta_signup', { 
-  program: 'beta',
-  conversionPoint: true
-});
+async function storeActivity({ user_id, activity_type, details, ip_address }) {
+  try {
+    // Check if the user_activity table exists
+    const tableExists = await db.queryOne(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'user_activity'
+      );
+    `);
+    
+    // If table doesn't exist, create it
+    if (!tableExists || !tableExists.exists) {
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS user_activity (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          activity_type VARCHAR(50) NOT NULL,
+          details JSONB NOT NULL,
+          ip_address VARCHAR(45),
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS user_activity_user_id_idx ON user_activity(user_id);
+        CREATE INDEX IF NOT EXISTS user_activity_type_idx ON user_activity(activity_type);
+        CREATE INDEX IF NOT EXISTS user_activity_created_at_idx ON user_activity(created_at);
+      `);
+    }
+    
+    // Insert activity
+    return await db.execute(
+      'INSERT INTO user_activity (user_id, activity_type, details, ip_address, created_at) VALUES ($1, $2, $3, $4, NOW())',
+      [user_id, activity_type, details, ip_address]
+    );
+  } catch (error) {
+    // Log error but don't throw - tracking should never break the app
+    logger.error('Failed to store user activity', { error, activity_type, user_id });
+  }
+}
 
 /**
- * Track login
- * Specialized middleware for tracking user logins
+ * Extract source from referrer URL
+ * 
+ * @param {string|null} referrer - Referrer URL
+ * @returns {string|null} Source name or null
  */
-const trackLogin = trackUserAction('user_login');
-
-module.exports = {
-  trackPageVisit,
-  trackUserAction,
-  trackBetaSignup,
-  trackLogin
-};
+function extractSourceFromReferrer(referrer) {
+  if (!referrer) return null;
+  
+  try {
+    const url = new URL(referrer);
+    const hostname = url.hostname.toLowerCase();
+    
+    // Extract source from common referrers
+    if (hostname.includes('google')) return 'Google';
+    if (hostname.includes('bing')) return 'Bing';
+    if (hostname.includes('yahoo')) return 'Yahoo';
+    if (hostname.includes('facebook') || hostname.includes('fb.com')) return 'Facebook';
+    if (hostname.includes('twitter') || hostname.includes('t.co')) return 'Twitter';
+    if (hostname.includes('linkedin')) return 'LinkedIn';
+    if (hostname.includes('instagram')) return 'Instagram';
+    if (hostname.includes('producthunt')) return 'Product Hunt';
+    if (hostname.includes('reddit')) return 'Reddit';
+    if (hostname.includes('youtube')) return 'YouTube';
+    
+    // If it's our own domain, it's a direct visit
+    if (hostname.includes('collectflo.com') || hostname === 'localhost') return 'Direct';
+    
+    // Otherwise, just use the hostname
+    return hostname;
+  } catch (error) {
+    return null;
+  }
+}

@@ -11,8 +11,9 @@ const session = require('express-session');
 const path = require('path');
 const morgan = require('morgan');
 const cors = require('cors');
-const helmet = require('helmet');
 const multer = require('multer');
+const PgSession = require('connect-pg-simple')(session);
+const { applySecurityMiddleware } = require('./backend/middleware/securityMiddleware');
 
 // Application modules
 const db = require('./backend/db/connection');
@@ -45,10 +46,10 @@ const SESSION_SECRET = process.env.SESSION_SECRET || 'collectflo-dev-secret';
 // Create Express app
 const app = express();
 
-// Security middleware
-app.use(helmet({
-  contentSecurityPolicy: false, // Disabled for simplicity in development
-}));
+// ---------------------------------------------------------------------------
+// Security / Hardening middleware (helmet, xss-clean, rate-limit, etc.)
+// ---------------------------------------------------------------------------
+applySecurityMiddleware(app);
 
 // CORS configuration
 app.use(cors({
@@ -97,6 +98,11 @@ app.use(session({
   secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
+  store: new PgSession({
+    // Use same Postgres database as application
+    conString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+  }),
   cookie: {
     secure: IS_PRODUCTION,
     httpOnly: true,

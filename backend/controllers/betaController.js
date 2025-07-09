@@ -19,10 +19,11 @@ const logger = require('../services/logger');
  */
 exports.signup = async (req, res) => {
   try {
-    const { companyName, fullName, email, password } = req.body;
+    // Standardised field names (see securityMiddleware.validateSignup)
+    const { company_name, name, email, password } = req.body;
     
     // Validate required fields
-    if (!companyName || !fullName || !email || !password) {
+    if (!company_name || !name || !email || !password) {
       return res.status(400).json({ 
         success: false, 
         message: 'All fields are required' 
@@ -63,14 +64,14 @@ exports.signup = async (req, res) => {
       // Create company
       const companyResult = await client.query(
         'INSERT INTO companies (name, created_at, is_beta) VALUES ($1, NOW(), true) RETURNING id',
-        [companyName]
+        [company_name]
       );
       const companyId = companyResult.rows[0].id;
       
       // Create user
       const userResult = await client.query(
         'INSERT INTO users (name, email, password, company_id, role, is_beta, created_at) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING id, email, name, role',
-        [fullName, email, hashedPassword, companyId, 'admin', true]
+        [name, email, hashedPassword, companyId, 'admin', true]
       );
       
       return {
@@ -90,7 +91,7 @@ exports.signup = async (req, res) => {
     };
     
     // Log beta signup
-    logger.info(`New beta user signed up: ${email} for company: ${companyName}`, { 
+    logger.info(`New beta user signed up: ${email} for company: ${company_name}`, { 
       userId: result.user.id,
       isBeta: true 
     });
