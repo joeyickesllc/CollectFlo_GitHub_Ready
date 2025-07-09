@@ -6,7 +6,6 @@
  */
 
 const bcrypt = require('bcryptjs');
-// Database connection will be imported here
 const db = require('../db/connection');
 const logger = require('../services/logger');
 
@@ -92,10 +91,15 @@ exports.login = async (req, res) => {
  */
 exports.signup = async (req, res) => {
   try {
-    const { name, email, password, companyName } = req.body;
+    // Accept either camelCase or snake_case sent from the client. The
+    // security middleware already normalises these, but we keep this
+    // fallback to stay backward-compatible.
+    const company_name = req.body.company_name || req.body.companyName;
+    const name        = req.body.name        || req.body.fullName;
+    const { email, password } = req.body;
 
     // Validate input
-    if (!name || !email || !password || !companyName) {
+    if (!name || !email || !password || !company_name) {
       return res.status(400).json({ 
         success: false, 
         message: 'Name, email, password, and company name are required' 
@@ -137,7 +141,7 @@ exports.signup = async (req, res) => {
       // Create company
       const companyResult = await client.query(
         'INSERT INTO companies (name, created_at) VALUES ($1, NOW()) RETURNING id',
-        [companyName]
+        [company_name]
       );
       const companyId = companyResult.rows[0].id;
 
@@ -163,7 +167,7 @@ exports.signup = async (req, res) => {
     };
 
     // Log signup
-    logger.info(`New user signed up: ${email} for company: ${companyName}`, { userId: result.user.id });
+    logger.info(`New user signed up: ${email} for company: ${company_name}`, { userId: result.user.id });
 
     // Return success
     return res.status(201).json({

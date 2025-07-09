@@ -20,6 +20,13 @@ const betaController = require('../controllers/betaController');
 // Import middleware
 const { requireAuth } = require('../middleware/authMiddleware');
 const errorMiddleware = require('../middleware/errorMiddleware');
+const { trackPageVisit, trackBetaSignup, trackLogin, trackUserAction } = require('../middleware/trackingMiddleware');
+const {
+  validateLogin,
+  validateSignup,
+  authRateLimiter,
+  signupRateLimiter,
+} = require('../middleware/securityMiddleware');
 const logger = require('../services/logger');
 
 // Apply request logger middleware to all API routes
@@ -28,7 +35,12 @@ router.use(logger.requestLogger);
 /**
  * Authentication Routes
  */
-router.post('/login', async (req, res, next) => {
+router.post(
+  '/login',
+  authRateLimiter,          // Protect against brute-force
+  validateLogin,            // Input validation / sanitisation
+  trackLogin,               // Track successful / failed attempts
+  async (req, res, next) => {
   try {
     await authController.login(req, res);
   } catch (error) {
@@ -36,7 +48,12 @@ router.post('/login', async (req, res, next) => {
   }
 });
 
-router.post('/signup', async (req, res, next) => {
+router.post(
+  '/signup',
+  signupRateLimiter,        // Limit account creation
+  validateSignup,           // Validate & sanitise input
+  trackUserAction('user_signup'),
+  async (req, res, next) => {
   try {
     await authController.signup(req, res);
   } catch (error) {
@@ -173,7 +190,12 @@ router.post('/sync-invoices', async (req, res, next) => {
 /**
  * Beta Program Routes
  */
-router.post('/beta-signup', async (req, res, next) => {
+router.post(
+  '/beta-signup',
+  signupRateLimiter,
+  validateSignup,
+  trackBetaSignup,
+  async (req, res, next) => {
   try {
     await betaController.signup(req, res);
   } catch (error) {

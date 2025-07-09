@@ -30,11 +30,13 @@
       <form onsubmit="handleBetaSignup(event)" class="space-y-6 bg-white p-8 rounded-lg shadow">
         <div>
           <label class="block text-sm font-medium mb-1">Company Name</label>
-          <input type="text" id="companyName" required class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-purple-500">
+          <input type="text" id="company_name" required class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-purple-500">
+          <p class="text-xs text-gray-500 mt-1">Your company or organization name</p>
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">Full Name</label>
-          <input type="text" id="fullName" required class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-purple-500">
+          <input type="text" id="name" required class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-purple-500">
+          <p class="text-xs text-gray-500 mt-1">Your first and last name</p>
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">Work Email</label>
@@ -43,6 +45,7 @@
         <div>
           <label class="block text-sm font-medium mb-1">Password</label>
           <input type="password" id="password" required class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-purple-500">
+          <p class="text-xs text-gray-500 mt-1">Minimum 8 characters, include a number and a letter</p>
         </div>
 
         <div class="bg-purple-50 p-4 rounded-lg border border-purple-200">
@@ -55,7 +58,7 @@
           </ul>
         </div>
 
-        <button type="submit" class="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700">
+        <button type="submit" id="submit-button" class="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700">
           Join Beta Program
         </button>
       </form>
@@ -96,43 +99,63 @@
       form.insertBefore(successDiv, form.firstChild);
     }
 
+    function validateForm() {
+      const company_name = document.getElementById('company_name').value.trim();
+      const name = document.getElementById('name').value.trim();
+      const email = document.getElementById('email').value.trim().toLowerCase();
+      const password = document.getElementById('password').value;
+      
+      // Basic validation
+      if (!company_name || company_name.length < 2) {
+        showError('Company name must be at least 2 characters long.');
+        return false;
+      }
+      
+      if (!name || name.length < 2) {
+        showError('Full name must be at least 2 characters long.');
+        return false;
+      }
+      
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        showError('Please enter a valid email address.');
+        return false;
+      }
+      
+      if (password.length < 8) {
+        showError('Password must be at least 8 characters long.');
+        return false;
+      }
+      
+      if (!/[a-zA-Z]/.test(password) || !/\d/.test(password)) {
+        showError('Password must include at least one letter and one number.');
+        return false;
+      }
+      
+      return true;
+    }
+
     async function handleBetaSignup(event) {
       event.preventDefault();
 
-      // Clear any existing error messages
-      const existingError = document.getElementById('error-message');
-      if (existingError) {
-        existingError.remove();
+      // Validate form before submission
+      if (!validateForm()) {
+        return;
       }
 
       // Add loading state
-      const submitButton = event.target.querySelector('button[type="submit"]');
+      const submitButton = document.getElementById('submit-button');
       const originalText = submitButton.innerHTML;
       submitButton.disabled = true;
       submitButton.innerHTML = 'Creating Account...';
 
       const formData = {
-        companyName: document.getElementById('companyName').value.trim(),
-        fullName: document.getElementById('fullName').value.trim(),
+        company_name: document.getElementById('company_name').value.trim(),
+        name: document.getElementById('name').value.trim(),
         email: document.getElementById('email').value.trim().toLowerCase(),
         password: document.getElementById('password').value,
         betaUser: true
       };
-
-      // Basic frontend validation
-      if (!formData.companyName || !formData.fullName || !formData.email || !formData.password) {
-        showError('Please fill in all required fields.');
-        submitButton.disabled = false;
-        submitButton.innerHTML = originalText;
-        return;
-      }
-
-      if (formData.password.length < 6) {
-        showError('Password must be at least 6 characters long.');
-        submitButton.disabled = false;
-        submitButton.innerHTML = originalText;
-        return;
-      }
 
       console.log('Beta signup attempt:', formData);
 
@@ -154,7 +177,12 @@
           }, 1500);
         } else {
           console.error('Beta signup failed:', data);
-          showError(data.error || data.message || 'Signup failed. Please try again.');
+          if (data.errors && data.errors.length > 0) {
+            // Handle validation errors from the server
+            showError(data.errors[0].msg || data.message || 'Signup failed. Please check your information.');
+          } else {
+            showError(data.message || 'Signup failed. Please try again.');
+          }
         }
       } catch (error) {
         console.error('Beta signup error:', error);

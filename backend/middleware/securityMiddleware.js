@@ -1,0 +1,225 @@
+/**
+ * Security Middleware
+ * 
+ * Provides comprehensive security features for the CollectFlo application:
+ * - Input validation and sanitization
+ * - XSS protection
+ * - Rate limiting
+ * - Secure HTTP headers
+ * 
+ * These middlewares are designed to work in all environments and are
+ * especially important for production deployments on Render.
+ */
+
+const { body, validationResult } = require('express-validator');
+const rateLimit = require('express-rate-limit');
+const xssClean = require('xss-clean');
+const helmet = require('helmet');
+const logger = require('../services/logger');
+
+// Environment configuration
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const IS_RENDER = process.env.RENDER === 'true';
+
+/**
+ * Apply basic security middleware to Express app
+ * 
+ * @param {Object} app - Express app instance
+ */
+exports.applySecurityMiddleware = (app) => {
+  // Set secure HTTP headers
+  app.use(helmet({
+    contentSecurityPolicy: IS_PRODUCTION ? undefined : false, // Enable in production
+    crossOriginEmbedderPolicy: false, // Allow embedding in iframes
+    crossOriginResourcePolicy: { policy: 'cross-origin' } // Allow cross-origin resource sharing
+  }));
+
+  // Prevent XSS attacks
+  app.use(xssClean());
+
+  // Apply global rate limiting
+  app.use(
+    rateLimit({
+      windowMs: 15 * 60 * 1000, // 15 minutes
+      max: 100, // Limit each IP to 100 requests per window
+      standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+      legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+      message: { success: false, message: 'Too many requests, please try again later.' },
+      skip: (req) => req.path === '/health', // Don't rate limit health checks
+      handler: (req, res, next, options) => {
+        logger.warn('Rate limit exceeded', {
+          ip: req.ip,
+          path: req.path,
+          method: req.method
+        });
+        res.status(429).json(options.message);
+      }
+    })
+  );
+
+  logger.info('Security middleware applied', {
+    helmet: true,
+    xssProtection: true,
+    rateLimit: true
+  });
+};
+
+/**
+ * More aggressive rate limiting for authentication routes
+ * to prevent brute force attacks
+ */
+exports.authRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10, // 10 attempts per hour
+  message: { success: false, message: 'Too many login attempts, please try again later.' },
+  standardHeaders: true,
+  handler: (req, res, next, options) => {
+    logger.warn('Auth rate limit exceeded', {
+      ip: req.ip,
+      path: req.path,
+      method: req.method
+    });
+    res.status(429).json(options.message);
+  }
+});
+
+/**
+ * Rate limiting for signup routes
+ */
+exports.signupRateLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000, // 24 hours
+  max: 5, // 5 accounts per day
+  message: { success: false, message: 'Account creation limit reached, please try again later.' },
+  standardHeaders: true,
+  handler: (req, res, next, options) => {
+    logger.warn('Signup rate limit exceeded', {
+      ip: req.ip,
+      path: req.path,
+      method: req.method
+    });
+    res.status(429).json(options.message);
+  }
+});
+
+/**
+ * API rate limiting for specific endpoints
+ */
+exports.apiRateLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 50, // 50 requests per 5 minutes
+  message: { success: false, message: 'API rate limit exceeded, please try again later.' },
+  standardHeaders: true
+});
+
+/**
+ * Validation rules for user registration
+ */
+exports.validateSignup = [
+  body('email')
+    .isEmail().withMessage('Please provide a valid email address')
+    .normalizeEmail()
+    .trim(),
+  
+  body('password')
+    .isLength({ min: 8 }).withMessage('Password must be at least 8 characters long')
+    .matches(/[a-zA-Z]/).withMessage('Password must contain at least one letter')
+    .matches(/\d/).withMessage('Password must contain at least one number')
+    .trim(),
+  
+  body(['name', 'fullName', 'companyName'])
+    .if(body('name').exists())
+    .trim()
+    .isLength({ min: 2 }).withMessage('Name must be at least 2 characters long')
+    .escape(),
+  
+  body(['companyName', 'company_name'])
+    .if(body('companyName').exists().or(body('company_name').exists()))
+    .trim()
+    .isLength({ min: 2 }).withMessage('Company name must be at least 2 characters long')
+    .escape(),
+  
+  // Validation middleware handler
+  (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+    
+    // Standardize field names for the API
+    if (req.body.companyName && !req.body.company_name) {
+      req.body.company_name = req.body.companyName;
+    }
+    
+    if (req.body.fullName && !req.body.name) {
+      req.body.name = req.body.fullName;
+    }
+    
+    next();
+  }
+];
+
+/**
+ * Validation rules for login
+ */
+exports.validateLogin = [
+  body('email')
+    .isEmail().withMessage('Please provide a valid email address')
+    .normalizeEmail()
+    .trim(),
+  
+  body('password')
+    .not().isEmpty().withMessage('Password is required')
+    .trim(),
+  
+  // Validation middleware handler
+  (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+    next();
+  }
+];
+
+/**
+ * Sanitize all request parameters to prevent injection attacks
+ */
+exports.sanitizeParams = (req, res, next) => {
+  if (req.params) {
+    Object.keys(req.params).forEach(key => {
+      if (typeof req.params[key] === 'string') {
+        req.params[key] = req.params[key].replace(/[<>]/g, '');
+      }
+    });
+  }
+  next();
+};
+
+/**
+ * Log all requests for security monitoring
+ */
+exports.securityLogger = (req, res, next) => {
+  // Only log certain paths that might be security-sensitive
+  if (
+    req.path.includes('/login') ||
+    req.path.includes('/signup') ||
+    req.path.includes('/auth') ||
+    req.path.includes('/settings')
+  ) {
+    logger.info('Security-sensitive request', {
+      method: req.method,
+      path: req.path,
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+  }
+  next();
+};

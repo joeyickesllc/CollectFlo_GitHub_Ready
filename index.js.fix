@@ -11,8 +11,9 @@ const session = require('express-session');
 const path = require('path');
 const morgan = require('morgan');
 const cors = require('cors');
-const helmet = require('helmet');
 const multer = require('multer');
+const PgSession = require('connect-pg-simple')(session);
+const { applySecurityMiddleware } = require('./backend/middleware/securityMiddleware');
 
 // Application modules
 const db = require('./backend/db/connection');
@@ -22,6 +23,8 @@ const jobQueue = require('./backend/services/jobQueue');
 
 // Migration runner
 const runMigrations = require('./backend/scripts/runMigrations');
+// Tracking middleware
+const { trackPageVisit } = require('./backend/middleware/trackingMiddleware');
 
 // ---------------------------------------------------------------------------
 // Redis / Job-Queue mode check
@@ -43,10 +46,10 @@ const SESSION_SECRET = process.env.SESSION_SECRET || 'collectflo-dev-secret';
 // Create Express app
 const app = express();
 
-// Security middleware
-app.use(helmet({
-  contentSecurityPolicy: false, // Disabled for simplicity in development
-}));
+// ---------------------------------------------------------------------------
+// Security / Hardening middleware (helmet, xss-clean, rate-limit, etc.)
+// ---------------------------------------------------------------------------
+applySecurityMiddleware(app);
 
 // CORS configuration
 app.use(cors({
@@ -95,12 +98,24 @@ app.use(session({
   secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
+  store: new PgSession({
+    // Use same Postgres database as application
+    conString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+  }),
   cookie: {
     secure: IS_PRODUCTION,
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
+
+// ---------------------------------------------------------------------------
+// Page-visit tracking
+// ---------------------------------------------------------------------------
+// Must be registered BEFORE static file middleware so it only runs once per
+// real page view and not for every asset request.
+app.use(trackPageVisit);
 
 // Configure file uploads
 const upload = multer({
