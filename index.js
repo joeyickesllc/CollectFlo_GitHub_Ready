@@ -1,34 +1,30 @@
 /**
- * CollectFlo - Main Application Entry Point
+ * CollectFlo API Server
  * 
- * This is the main entry point for the CollectFlo application.
- * It sets up the Express server, middleware, routes, and error handling.
+ * Main application entry point that sets up Express, middleware,
+ * database connections, and API routes.
  */
 
-// Core dependencies
-const express = require('express');
-const path = require('path');
-const fs = require('fs');
-const session = require('express-session');
-const multer = require('multer');
 require('dotenv').config();
+const express = require('express');
+const session = require('express-session');
+const path = require('path');
+const morgan = require('morgan');
+const cors = require('cors');
+const multer = require('multer');
+const PgSession = require('connect-pg-simple')(session);
+const { applySecurityMiddleware } = require('./backend/middleware/securityMiddleware');
 
-// Database
+// Application modules
 const db = require('./backend/db/connection');
-
-// Middleware
-const { attachUser, requireAuth } = require('./backend/middleware/authMiddleware');
-const errorMiddleware = require('./backend/middleware/errorMiddleware');
-
-// Routes
-const apiRoutes = require('./backend/routes/api');
-
-// Services
+const apiRoutes = require('./backend/routes');
 const logger = require('./backend/services/logger');
 const jobQueue = require('./backend/services/jobQueue');
-// const errorHandler = require('./services/errorHandler'); // This is now replaced by errorMiddleware
+
 // Migration runner
 const runMigrations = require('./backend/scripts/runMigrations');
+// Tracking middleware
+const { trackPageVisit } = require('./backend/middleware/trackingMiddleware');
 
 // ---------------------------------------------------------------------------
 // Redis / Job-Queue mode check
@@ -43,35 +39,83 @@ if (jobQueue.usingMockImplementation) {
 // Environment variables
 const PORT = process.env.PORT || 3000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
+const IS_PRODUCTION = NODE_ENV === 'production';
+const IS_RENDER = process.env.RENDER === 'true';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'collectflo-dev-secret';
-const SESSION_MAX_AGE = parseInt(process.env.SESSION_MAX_AGE || (24 * 60 * 60 * 1000), 10); // 24 hours in ms
 
-// Initialize Express app
+// Create Express app
 const app = express();
 
-// Configure session storage
-// In production, you would use a more robust session store like Redis or PostgreSQL
-// For simplicity, we're using the default MemoryStore here
+// ---------------------------------------------------------------------------
+// Security / Hardening middleware (helmet, xss-clean, rate-limit, etc.)
+// ---------------------------------------------------------------------------
+applySecurityMiddleware(app);
+
+// CORS configuration
+app.use(cors({
+  origin: IS_PRODUCTION ? 
+    ['https://collectflo.com', /\.collectflo\.com$/] : 
+    'http://localhost:3000',
+  credentials: true
+}));
+
+// Request logging
+if (IS_PRODUCTION) {
+  // Production: use Winston for structured logging
+  app.use((req, res, next) => {
+    const start = Date.now();
+    
+    // Log when the response finishes
+    res.on('finish', () => {
+      const duration = Date.now() - start;
+      const logLevel = res.statusCode >= 400 ? 'warn' : 'info';
+      
+      logger[logLevel](`HTTP ${req.method} ${req.url} ${res.statusCode} - ${duration}ms`, {
+        method: req.method,
+        url: req.url,
+        statusCode: res.statusCode,
+        duration,
+        contentLength: res.get('content-length'),
+        requestId: req.headers['x-request-id'] || `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        ip: req.ip,
+        userAgent: req.headers['user-agent']
+      });
+    });
+    
+    next();
+  });
+} else {
+  // Development: use Morgan for console-friendly logs
+  app.use(morgan('dev'));
+}
+
+// Body parsing middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Session configuration
 app.use(session({
   secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
+  store: new PgSession({
+    // Use same Postgres database as application
+    conString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+  }),
   cookie: {
-    secure: NODE_ENV === 'production', // Use secure cookies in production
+    secure: IS_PRODUCTION,
     httpOnly: true,
-    maxAge: SESSION_MAX_AGE
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
 
-// Request logging middleware
-app.use(logger.requestLogger);
-
-// Parse JSON and URL-encoded bodies
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Attach user to res.locals if authenticated
-app.use(attachUser);
+// ---------------------------------------------------------------------------
+// Page-visit tracking
+// ---------------------------------------------------------------------------
+// Must be registered BEFORE static file middleware so it only runs once per
+// real page view and not for every asset request.
+app.use(trackPageVisit);
 
 // Configure file uploads
 const upload = multer({
@@ -79,6 +123,11 @@ const upload = multer({
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB limit
   }
+});
+
+// Root route handler - MOVED BEFORE static file middleware
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'landing.html'));
 });
 
 // Serve static files from the public directory
@@ -93,11 +142,6 @@ app.get('/auth/qbo', (req, res) => {
   res.status(501).send('QuickBooks OAuth flow not implemented yet');
 });
 
-app.get('/auth/qbo/callback', (req, res) => {
-  // This will be implemented in a separate controller
-  res.status(501).send('QuickBooks OAuth callback not implemented yet');
-});
-
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({
@@ -105,11 +149,6 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     environment: NODE_ENV
   });
-});
-
-// Serve index.html for the root route
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'landing.html'));
 });
 
 // Serve HTML pages for various routes
@@ -133,48 +172,43 @@ const htmlRoutes = [
 
 // Register HTML routes
 htmlRoutes.forEach(route => {
-  const handlers = [];
-  
-  // Add authentication middleware if required
-  if (route.auth) {
-    handlers.push(requireAuth);
-  }
-  
-  // Add the route handler
-  handlers.push((req, res) => {
+  app.get(route.path, (req, res) => {
+    // Check if route requires authentication
+    if (route.auth && !req.session.user) {
+      return res.redirect('/login?redirect=' + encodeURIComponent(req.path));
+    }
+    
     res.sendFile(path.join(__dirname, 'public', route.file));
   });
-  
-  // Register the route
-  app.get(route.path, ...handlers);
 });
 
-// 404 handler for undefined routes
-app.use((req, res, next) => {
+// Catch-all route for 404s
+app.use((req, res) => {
   res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
 });
 
-// Error logging middleware
-app.use(logger.errorLogger);
-
 // Error handling middleware
 app.use((err, req, res, next) => {
-  // Use the existing error handler service
-  errorMiddleware(err, req, res, next);
+  logger.error('Unhandled error in API route: ' + req.method + ' ' + req.url, {
+    method: req.method,
+    url: req.url,
+    error: err.message,
+    stack: err.stack
+  });
+  
+  res.status(err.status || 500).json({
+    error: IS_PRODUCTION ? 'An unexpected error occurred' : err.message
+  });
 });
 
-// -----------------------------------------------------------------------------
-// Bootstrap sequence: run DB migrations, then start server & scheduler
-// -----------------------------------------------------------------------------
-let server; // will hold HTTP server instance for graceful shutdown
-
-async function bootstrap() {
+// Application startup
+async function startServer() {
   try {
-    // Run pending migrations before the app starts accepting traffic
+    // Run database migrations
     await runMigrations();
-
-    // Start the HTTP server
-    server = app.listen(PORT, () => {
+    
+    // Start the server
+    app.listen(PORT, () => {
       logger.info(`CollectFlo server listening on port ${PORT} in ${NODE_ENV} mode`);
     });
 
@@ -192,23 +226,20 @@ async function bootstrap() {
   }
 }
 
-// Kick off the bootstrap process
-bootstrap();
+// Start the application
+startServer();
 
-// Graceful shutdown
+// Handle graceful shutdown
 process.on('SIGTERM', gracefulShutdown);
 process.on('SIGINT', gracefulShutdown);
 
-/**
- * Perform a graceful shutdown of the server and resources
- */
 async function gracefulShutdown() {
-  logger.info('Received shutdown signal, closing server...');
+  logger.info('Received shutdown signal, closing connections...');
   
-  // Close the HTTP server
-  server.close(() => {
-    logger.info('HTTP server closed');
-  });
+  // Close the HTTP server first to stop accepting new requests
+  if (server) {
+    server.close();
+  }
   
   try {
     // Shutdown job queues
@@ -228,9 +259,7 @@ async function gracefulShutdown() {
     logger.info('Graceful shutdown completed');
     process.exit(0);
   } catch (error) {
-    logger.error('Error during graceful shutdown:', { error });
+    logger.error('Error during graceful shutdown', { error });
     process.exit(1);
   }
 }
-
-module.exports = app;
