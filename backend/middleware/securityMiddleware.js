@@ -34,8 +34,19 @@ exports.applySecurityMiddleware = (app) => {
     crossOriginResourcePolicy: { policy: 'cross-origin' } // Allow cross-origin resource sharing
   }));
 
-  // Prevent XSS attacks
-  app.use(xssClean());
+  /*
+   * ---------------------------------------------------------------------------
+   * X-XSS Protection
+   * ---------------------------------------------------------------------------
+   * `xss-clean@0.1.4` mutates `req.query` which became read-only in Express 5.
+   * This results in the runtime error:
+   *     "TypeError: Cannot set property query of #<IncomingMessage>..."
+   *
+   * Until a compatible version (or alternative middleware) is available we
+   * temporarily disable xss-clean to keep the application functional.  Basic
+   * protection is still provided by Helmet’s built-in X-XSS-Protection header.
+   */
+  logger.warn('xss-clean middleware disabled – incompatible with Express 5.x');
 
   // Apply global rate limiting
   app.use(
@@ -59,7 +70,7 @@ exports.applySecurityMiddleware = (app) => {
 
   logger.info('Security middleware applied', {
     helmet: true,
-    xssProtection: true,
+    xssProtection: false, // Temporarily disabled (see note above)
     rateLimit: true
   });
 };
