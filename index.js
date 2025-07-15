@@ -17,7 +17,7 @@ const { applySecurityMiddleware } = require('./backend/middleware/securityMiddle
 
 // Application modules
 const db = require('./backend/db/connection');
-const apiRoutes = require('./backend/routes');
+const apiRoutes = require('./backend/routes/api');
 const logger = require('./backend/services/logger');
 const jobQueue = require('./backend/services/jobQueue');
 
