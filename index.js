@@ -43,6 +43,9 @@ const IS_PRODUCTION = NODE_ENV === 'production';
 const IS_RENDER = process.env.RENDER === 'true';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'collectflo-dev-secret';
 
+// HTTP server instance for graceful shutdown
+let server;
+
 // Create Express app
 const app = express();
 
@@ -207,8 +210,8 @@ async function startServer() {
     // Run database migrations
     await runMigrations();
     
-    // Start the server
-    app.listen(PORT, () => {
+    // Start the server and keep a reference for graceful shutdown
+    server = app.listen(PORT, () => {
       logger.info(`CollectFlo server listening on port ${PORT} in ${NODE_ENV} mode`);
     });
 
