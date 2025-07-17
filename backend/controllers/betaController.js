@@ -100,6 +100,9 @@ exports.signup = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: 'Beta signup successful',
+      // Where the frontend should navigate after successful signup
+      // (kept generic; the client app can append query params if it wants)
+      redirect: '/beta-onboarding',
       user: {
         id: result.user.id,
         email: result.user.email,

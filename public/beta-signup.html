@@ -137,9 +137,11 @@
 
     async function handleBetaSignup(event) {
       event.preventDefault();
+      console.log('[β-signup] submit start');
 
       // Validate form before submission
       if (!validateForm()) {
+        console.log('[β-signup] validation failed');
         return;
       }
 
@@ -151,15 +153,15 @@
 
       const formData = {
         company_name: document.getElementById('company_name').value.trim(),
-        companyName: document.getElementById('company_name').value.trim(), // camelCase alias
-        name: document.getElementById('name').value.trim(),
-        fullName: document.getElementById('name').value.trim(),           // camelCase alias
-        email: document.getElementById('email').value.trim().toLowerCase(),
-        password: document.getElementById('password').value,
-        betaUser: true
+        companyName : document.getElementById('company_name').value.trim(), // camelCase alias
+        name        : document.getElementById('name').value.trim(),
+        fullName    : document.getElementById('name').value.trim(),        // camelCase alias
+        email       : document.getElementById('email').value.trim().toLowerCase(),
+        password    : document.getElementById('password').value,
+        betaUser    : true
       };
 
-      console.log('Beta signup attempt:', formData);
+      console.log('[β-signup] sending request', formData);
 
       try {
         const response = await fetch('/api/beta-signup', {
@@ -168,17 +170,29 @@
           body: JSON.stringify(formData)
         });
 
-        const data = await response.json();
-        console.log('Beta signup response:', data);
+        console.log('[β-signup] response status', response.status);
+
+        // Read raw text first for better error handling / logging
+        const rawText = await response.text();
+        console.log('[β-signup] raw response', rawText.substring(0, 200) + (rawText.length > 200 ? '…' : ''));
+
+        let data;
+        try {
+          data = JSON.parse(rawText);
+        } catch (e) {
+          console.error('[β-signup] JSON parse error', e);
+          showError('Invalid response from server. Please try again.');
+          return;
+        }
 
         if (response.ok) {
-          console.log('Beta signup successful, redirecting to:', data.redirect);
+          console.log('[β-signup] success – redirecting');
           showSuccess('Account created successfully! Redirecting...');
           setTimeout(() => {
             window.location.href = data.redirect || '/beta-onboarding?from=beta-signup';
           }, 1500);
         } else {
-          console.error('Beta signup failed:', data);
+          console.error('[β-signup] server error', data);
           if (data.errors && data.errors.length > 0) {
             // Handle validation errors from the server
             showError(data.errors[0].msg || data.message || 'Signup failed. Please check your information.');
@@ -192,6 +206,7 @@
       } finally {
         submitButton.disabled = false;
         submitButton.innerHTML = originalText;
+        console.log('[β-signup] submit end');
       }
     }
   </script>
