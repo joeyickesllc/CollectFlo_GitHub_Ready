@@ -27,12 +27,43 @@ const IS_RENDER = process.env.RENDER === 'true';
  * @param {Object} app - Express app instance
  */
 exports.applySecurityMiddleware = (app) => {
-  // Set secure HTTP headers
-  app.use(helmet({
-    contentSecurityPolicy: IS_PRODUCTION ? undefined : false, // Enable in production
-    crossOriginEmbedderPolicy: false, // Allow embedding in iframes
-    crossOriginResourcePolicy: { policy: 'cross-origin' } // Allow cross-origin resource sharing
-  }));
+  /**
+   * -------------------------------------------------------------------------
+   * Content-Security-Policy (CSP)
+   * -------------------------------------------------------------------------
+   * The beta marketing pages (beta.html, beta-signup.html, etc.) currently rely
+   * on small inline scripts and styles (e.g. Tailwind utility classes injected
+   * by the CDN). Helmet's default CSP blocks these which breaks critical UI
+   * elements such as the "Free Lifetime Access" button.
+   *
+   * For now we relax the CSP by:
+   *   • explicitly allowing 'unsafe-inline' for script and style sources
+   *   • allowing the jsDelivr CDN which hosts Tailwind
+   *
+   * NOTE: This still blocks all remote code execution except from self or the
+   *       approved CDN and can be tightened later once inline scripts are
+   *       removed/refactored.
+   */
+  const cspDirectives = {
+    defaultSrc: ["'self'"],
+    scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
+    styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
+    imgSrc: ["'self'", 'data:', 'https:'],
+    connectSrc: ["'self'"],
+    fontSrc: ["'self'", 'https://cdn.jsdelivr.net'],
+    objectSrc: ["'none'"],
+    mediaSrc: ["'self'"],
+    frameSrc: ["'self'"]
+  };
+
+  // Set secure HTTP headers with the adjusted CSP
+  app.use(
+    helmet({
+      contentSecurityPolicy: IS_PRODUCTION ? { directives: cspDirectives } : false,
+      crossOriginEmbedderPolicy: false, // Allow embedding in iframes
+      crossOriginResourcePolicy: { policy: 'cross-origin' } // Allow cross-origin resource sharing
+    })
+  );
 
   /*
    * ---------------------------------------------------------------------------
@@ -43,8 +74,8 @@ exports.applySecurityMiddleware = (app) => {
    *     "TypeError: Cannot set property query of #<IncomingMessage>..."
    *
    * Until a compatible version (or alternative middleware) is available we
-   * temporarily disable xss-clean to keep the application functional.  Basic
-   * protection is still provided by Helmet’s built-in X-XSS-Protection header.
+   * temporarily disable xss-clean to keep the application functional. Basic
+   * protection is still provided by Helmet's built-in X-XSS-Protection header.
    */
   logger.warn('xss-clean middleware disabled – incompatible with Express 5.x');
 
