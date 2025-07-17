@@ -151,7 +151,9 @@
 
       const formData = {
         company_name: document.getElementById('company_name').value.trim(),
+        companyName: document.getElementById('company_name').value.trim(), // camelCase alias
         name: document.getElementById('name').value.trim(),
+        fullName: document.getElementById('name').value.trim(),           // camelCase alias
         email: document.getElementById('email').value.trim().toLowerCase(),
         password: document.getElementById('password').value,
         betaUser: true
