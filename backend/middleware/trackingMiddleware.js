@@ -274,13 +274,31 @@ async function storeActivity({ user_id, activity_type, details, ip_address }) {
     }
     
     // Insert activity
+    // ------------------------------------------------------------------
+    // Safety-check: make sure details is ALWAYS a JSON object
+    // ------------------------------------------------------------------
+    const safeDetails = details || {};
+
+    // Helpful debug log – can be filtered by `activity_type`
+    logger.info('Storing user activity', {
+      activity_type,
+      user_id,
+      details_keys: Object.keys(safeDetails)
+    });
+
     return await db.execute(
       'INSERT INTO user_activity (user_id, activity_type, details, ip_address, created_at) VALUES ($1, $2, $3, $4, NOW())',
-      [user_id, activity_type, details, ip_address]
+      [user_id, activity_type, safeDetails, ip_address]
     );
   } catch (error) {
     // Log error but don't throw - tracking should never break the app
-    logger.error('Failed to store user activity', { error, activity_type, user_id });
+    logger.error('Failed to store user activity', { 
+      errorCode: error.code,
+      errorMessage: error.message,
+      activity_type,
+      user_id,
+      detailsKeys: details ? Object.keys(details) : 'no details provided'
+    });
   }
 }
 
