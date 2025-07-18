@@ -69,6 +69,9 @@
 
       <!-- Toast notification container -->
       <div id="toast-container" class="fixed inset-x-0 top-4 flex flex-col items-center space-y-2 z-50"></div>
+
+      <!-- Hidden debug console (enable via DevTools for troubleshooting) -->
+      <pre id="debug-log" class="hidden mt-6 w-full bg-gray-100 text-xs p-3 rounded overflow-auto"></pre>
     </div>
   </div>
 
@@ -107,28 +110,28 @@
       
       // Basic validation
       if (!company_name || company_name.length < 2) {
-        showError('Company name must be at least 2 characters long.');
+        showToast('error', 'Company name must be at least 2 characters long.');
         return false;
       }
       
       if (!name || name.length < 2) {
-        showError('Full name must be at least 2 characters long.');
+        showToast('error', 'Full name must be at least 2 characters long.');
         return false;
       }
       
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email)) {
-        showError('Please enter a valid email address.');
+        showToast('error', 'Please enter a valid email address.');
         return false;
       }
       
       if (password.length < 8) {
-        showError('Password must be at least 8 characters long.');
+        showToast('error', 'Password must be at least 8 characters long.');
         return false;
       }
       
       if (!/[a-zA-Z]/.test(password) || !/\d/.test(password)) {
-        showError('Password must include at least one letter and one number.');
+        showToast('error', 'Password must include at least one letter and one number.');
         return false;
       }
       
