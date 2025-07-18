@@ -14,6 +14,14 @@
 const db = require('../db/connection');
 const logger = require('../services/logger');
 
+// ---------------------------------------------------------------------------
+// Tracking state
+// ---------------------------------------------------------------------------
+// Keep a single in-memory flag so the application only checks/patches the
+// `user_activity` table structure (ip_address column) once per lifecycle
+// instead of on every request.  This avoids unnecessary queries at runtime.
+let userActivityColumnChecked = false;
+
 /**
  * Track page visits
  * 
@@ -271,6 +279,27 @@ async function storeActivity({ user_id, activity_type, details, ip_address }) {
         CREATE INDEX IF NOT EXISTS user_activity_type_idx ON user_activity(activity_type);
         CREATE INDEX IF NOT EXISTS user_activity_created_at_idx ON user_activity(created_at);
       `);
+    }
+    
+    /* ------------------------------------------------------------------
+     * Ensure ip_address column exists (older DBs may miss this column)
+     * ------------------------------------------------------------------ */
+    if (!userActivityColumnChecked) {
+      const colExists = await db.queryOne(
+        `SELECT EXISTS (
+           SELECT 1
+           FROM information_schema.columns
+           WHERE table_schema = 'public'
+             AND table_name   = 'user_activity'
+             AND column_name  = 'ip_address'
+         ) AS exists;`
+      );
+
+      if (!colExists || !colExists.exists) {
+        logger.info('Adding missing ip_address column to user_activity table');
+        await db.execute(`ALTER TABLE user_activity ADD COLUMN ip_address VARCHAR(45);`);
+      }
+      userActivityColumnChecked = true;
     }
     
     // Insert activity
