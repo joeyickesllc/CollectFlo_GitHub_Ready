@@ -2,7 +2,7 @@
  * Scheduler Service
  * 
  * Sets up cron-like scheduled tasks for the CollectFlo application.
- * Uses node-cron for scheduling with robust error handling and logging.
+ * Uses node-schedule for scheduling with robust error handling and logging.
  * 
  * Tasks include:
  * - Invoice sync
@@ -11,13 +11,13 @@
  * - Analytics aggregation
  */
 
-const cron = require('node-cron');
+const schedule = require('node-schedule');
 const logger = require('../backend/services/logger');
 const db = require('../backend/db/connection');
 const jobQueue = require('../backend/services/jobQueue');
 
 // Track all scheduled tasks for graceful shutdown
-const scheduledTasks = [];
+const scheduledJobs = {};
 
 /**
  * Initialize all scheduled tasks
@@ -133,24 +133,46 @@ function initScheduler() {
 }
 
 /**
+ * Validate a cron expression
+ * 
+ * @param {string} cronExpression - Cron schedule expression to validate
+ * @returns {boolean} Whether the expression is valid
+ */
+function validateCronExpression(cronExpression) {
+  try {
+    // Simple validation - if node-schedule can parse it, it's valid
+    // This will throw an error if the expression is invalid
+    const job = schedule.scheduleJob(cronExpression, () => {});
+    
+    if (job) {
+      job.cancel(); // Clean up the test job
+      return true;
+    }
+    return false;
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
  * Schedule a task with error handling
  * 
- * @param {string} schedule - Cron schedule expression
+ * @param {string} cronExpression - Cron schedule expression
  * @param {string} taskName - Name of the task for logging
  * @param {Function} task - The task function to execute
- * @returns {Object} The scheduled task
+ * @returns {Object} The scheduled job
  */
-function scheduleTask(schedule, taskName, task) {
+function scheduleTask(cronExpression, taskName, task) {
   try {
     // Validate cron expression
-    if (!cron.validate(schedule)) {
-      throw new Error(`Invalid cron expression: ${schedule}`);
+    if (!validateCronExpression(cronExpression)) {
+      throw new Error(`Invalid cron expression: ${cronExpression}`);
     }
 
-    logger.info(`Scheduling task: ${taskName} with schedule: ${schedule}`);
+    logger.info(`Scheduling task: ${taskName} with schedule: ${cronExpression}`);
     
     // Create the scheduled task with error handling wrapper
-    const scheduledTask = cron.schedule(schedule, async () => {
+    const job = schedule.scheduleJob(cronExpression, async () => {
       logger.debug(`Running scheduled task: ${taskName}`);
       
       try {
@@ -158,18 +180,16 @@ function scheduleTask(schedule, taskName, task) {
       } catch (error) {
         logger.error(`Error in scheduled task: ${taskName}`, { error });
       }
-    }, {
-      scheduled: true,
-      timezone: 'UTC' // Ensure consistent timezone for all scheduled tasks
     });
     
-    // Store task reference for shutdown
-    scheduledTasks.push({
-      name: taskName,
-      task: scheduledTask
-    });
+    if (!job) {
+      throw new Error(`Failed to schedule task: ${taskName}`);
+    }
     
-    return scheduledTask;
+    // Store job reference for shutdown
+    scheduledJobs[taskName] = job;
+    
+    return job;
   } catch (error) {
     logger.error(`Failed to schedule task: ${taskName}`, { error });
     return null;
@@ -181,18 +201,23 @@ function scheduleTask(schedule, taskName, task) {
  * Used during graceful shutdown
  */
 function stopAllTasks() {
-  logger.info(`Stopping ${scheduledTasks.length} scheduled tasks`);
+  const jobNames = Object.keys(scheduledJobs);
+  logger.info(`Stopping ${jobNames.length} scheduled tasks`);
   
-  scheduledTasks.forEach(({ name, task }) => {
+  jobNames.forEach(name => {
     try {
-      task.stop();
+      scheduledJobs[name].cancel();
       logger.debug(`Stopped scheduled task: ${name}`);
     } catch (error) {
       logger.error(`Error stopping scheduled task: ${name}`, { error });
     }
   });
   
-  scheduledTasks.length = 0; // Clear the array
+  // Clear all jobs
+  for (const key in scheduledJobs) {
+    delete scheduledJobs[key];
+  }
+  
   logger.info('All scheduled tasks stopped');
 }
 
