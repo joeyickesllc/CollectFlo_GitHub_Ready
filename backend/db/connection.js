@@ -15,6 +15,41 @@ require('dotenv').config();
 const { Pool } = require('pg');
 const logger = require('../services/logger');
 
+/**
+ * Safely serialise JS objects in parameter arrays so they can be stored in
+ * JSON / JSONB columns without raising “undefined column” or type errors.
+ *
+ *  • Dates, Buffers and primitive types are left untouched
+ *  • Plain objects/arrays are JSON-stringified
+ *  • Any serialization failure is caught and logged, value replaced by '{}'
+ *
+ * @param {Array|undefined|null} params
+ * @returns {Array|undefined|null}
+ */
+function serializeParams(params) {
+  if (!params) return params;
+
+  return params.map((param) => {
+    if (
+      param !== null &&
+      typeof param === 'object' &&
+      !(param instanceof Date) &&
+      !Buffer.isBuffer(param)
+    ) {
+      try {
+        return JSON.stringify(param);
+      } catch (err) {
+        logger.warn('Failed to serialise parameter for query – fallback to empty object', {
+          error: err.message,
+          paramSample: Array.isArray(param) ? 'Array' : Object.keys(param).slice(0, 3),
+        });
+        return '{}';
+      }
+    }
+    return param;
+  });
+}
+
 // Environment configuration
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const IS_PRODUCTION = NODE_ENV === 'production';
@@ -103,6 +138,7 @@ function initializeDatabase() {
     query: async (text, params) => {
       const start = Date.now();
       try {
+        params = serializeParams(params);
         const result = await pool.query(text, params);
         logger.info('DB query success', {
           text,
@@ -125,6 +161,7 @@ function initializeDatabase() {
     queryOne: async (text, params) => {
       const start = Date.now();
       try {
+        params = serializeParams(params);
         const result = await pool.query(text, params);
         logger.info('DB queryOne success', {
           text,
@@ -147,6 +184,7 @@ function initializeDatabase() {
     execute: async (text, params) => {
       const start = Date.now();
       try {
+        params = serializeParams(params);
         const result = await pool.query(text, params);
         logger.info('DB execute success', {
           text,
