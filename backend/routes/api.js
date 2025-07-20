@@ -78,6 +78,30 @@ router.get('/check-auth', async (req, res, next) => {
 });
 
 /**
+ * Return current authenticated user info
+ * 
+ * Front-end (nav.js) expects `/api/user-info` to return 200 with the
+ * user object when a session exists, or 401 when not authenticated.
+ */
+router.get('/user-info', async (req, res, next) => {
+  try {
+    if (req.session && req.session.user) {
+      // Only expose non-sensitive fields
+      const { id, email, name, role } = req.session.user;
+      return res.status(200).json({
+        success: true,
+        user: { id, email, name, role }
+      });
+    }
+
+    // Not authenticated
+    return res.status(401).json({ success: false, message: 'Not authenticated' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * Dashboard Routes
  * All dashboard routes require authentication
  */
