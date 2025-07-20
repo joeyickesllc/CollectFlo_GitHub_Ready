@@ -170,6 +170,11 @@ toast.innerHTML = `
       };
 
       try {
+        /* --------------------------------------------------------------
+         *  Send signup request
+         *  ----------------------------------------------------------- */
+        console.log('[β-signup] sending payload', payload);
+
         const res  = await fetch('/api/beta-signup', {
           method : 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -177,9 +182,21 @@ toast.innerHTML = `
         });
 
         const data = await res.json().catch(() => ({}));
+        console.log('[β-signup] response', res.status, data);
 
         if (res.ok) {
-          showToast('success', "Thanks! You're in the beta.");
+          /* ----------------------------------------------------------
+           *  SUCCESS  – server has ALREADY created the session cookie
+           *  ----------------------------------------------------------
+           *  No separate login is required; we can go straight to the
+           *  onboarding page.  The server returns a `redirect` field
+           *  we honour, or we fall back to the default.
+           * -------------------------------------------------------- */
+          showToast(
+            'success',
+            "You're in! Setting up your account & redirecting…"
+          );
+
           setTimeout(() => {
             window.location.href = data.redirect || '/beta-onboarding?from=beta-signup';
           }, 1500);
@@ -192,6 +209,7 @@ toast.innerHTML = `
         console.error(err);
         showToast('error', 'Network error. Please try again later.');
       } finally {
+        console.log('[β-signup] request finished');
         /* ----- reset loading state ----- */
         btn.disabled = false;
         label.textContent = 'Join Beta Program';
