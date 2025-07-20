@@ -19,7 +19,14 @@ const logger = require('../services/logger');
  */
 exports.login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, redirect: redirectFromClient } = req.body;
+
+    // Allow client to specify desired redirect – default to dashboard
+    const redirect = redirectFromClient && typeof redirectFromClient === 'string'
+      ? redirectFromClient
+      : '/dashboard';
+
+    logger.debug('Login attempt', { email, redirectRequested: redirectFromClient });
 
     // Validate input
     if (!email || !password) {
@@ -43,6 +50,7 @@ exports.login = async (req, res) => {
     // Compare passwords
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
+      logger.warn('Invalid password attempt', { email });
       return res.status(401).json({ 
         success: false, 
         message: 'Invalid credentials' 
@@ -59,12 +67,13 @@ exports.login = async (req, res) => {
     };
 
     // Log login activity
-    logger.info(`User logged in: ${user.email}`, { userId: user.id });
+    logger.info(`User logged in: ${user.email}`, { userId: user.id, redirect });
     
     // Return success
     return res.status(200).json({
       success: true,
       message: 'Login successful',
+      redirect,
       user: {
         id: user.id,
         email: user.email,

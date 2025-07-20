@@ -111,8 +111,12 @@
     async function handleLogin(event) {
       event.preventDefault();
       
+      // Debug: verify handler executed
+      console.log('[login] handleLogin called');
+
       // Validate form
       if (!validateForm()) {
+        console.log('[login] form validation failed');
         return;
       }
       
@@ -129,20 +133,30 @@
       };
       
       try {
+        console.log('[login] submitting', formData);
         const response = await fetch('/api/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData)
         });
         
-        const result = await response.json();
-        
-        if (response.ok) {
+        const result = await response.json().catch(() => ({}));
+
+        console.log('[login] response status', response.status, result);
+
+        // Successful HTTP **and** backend indicated success
+        if (response.ok && result.success) {
           // Redirect to dashboard or specified redirect URL
           window.location.href = result.redirect || redirectUrl;
+        } else if (response.status === 400 && result.errors?.length) {
+          // Validation errors from server
+          showError('Login Failed', result.errors[0].msg || 'Validation error. Please try again.');
         } else {
-          // Handle API error
-          showError('Login Failed', result.message || 'Invalid email or password. Please try again.');
+          // Generic or auth failure
+          showError(
+            'Login Failed',
+            result.message || 'Invalid email or password. Please try again.'
+          );
         }
       } catch (error) {
         console.error('Login error:', error);
