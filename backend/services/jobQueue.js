@@ -21,6 +21,7 @@ const path = require('path');
 const fs = require('fs');
 const { promisify } = require('util');
 const net = require('net');
+const tls = require('tls'); // For TLS-based Redis (rediss://)
 require('dotenv').config();
 
 // Load environment variables with defaults
@@ -122,22 +123,24 @@ let usingMockImplementation = false;
  */
 async function isRedisAvailable() {
   return new Promise(resolve => {
-    // Parse Redis URL to get host and port
     let host = '127.0.0.1';
     let port = 6379;
-    
+    let isTls = false;
+
     try {
-      if (REDIS_URL.startsWith('redis://')) {
-        const url = new URL(REDIS_URL);
-        host = url.hostname;
-        port = url.port || 6379;
-      }
+      const url = new URL(REDIS_URL);
+      host = url.hostname || host;
+      port = url.port || port;
+      isTls = url.protocol === 'rediss:';
     } catch (err) {
       console.warn(`Invalid Redis URL format: ${REDIS_URL}, using defaults`);
     }
-    
-    // Try to connect to Redis
-    const socket = net.createConnection(port, host);
+
+    // Choose net or tls socket based on protocol
+    const socket = isTls
+      ? tls.connect({ host, port, rejectUnauthorized: false })
+      : net.createConnection(port, host);
+
     const timeout = setTimeout(() => {
       socket.destroy();
       console.warn(`Redis connection timed out at ${host}:${port}`);
@@ -156,6 +159,34 @@ async function isRedisAvailable() {
       resolve(false);
     });
   });
+}
+
+/**
+ * Convert a redis/rediss URL string to an object Bull understands
+ * Adds TLS options automatically for rediss://
+ */
+function buildRedisConfig(redisUrl) {
+  try {
+    const url = new URL(redisUrl);
+    const config = {
+      host: url.hostname,
+      port: Number(url.port) || 6379
+    };
+
+    if (url.password) {
+      // Upstash embeds username `default` – ignore
+      config.password = url.password;
+    }
+
+    if (url.protocol === 'rediss:') {
+      config.tls = { rejectUnauthorized: false };
+    }
+
+    return config;
+  } catch (err) {
+    console.error('Error parsing REDIS_URL, falling back to simple string', err);
+    return redisUrl; // Let Bull attempt with raw URL
+  }
 }
 
 /**
@@ -412,7 +443,7 @@ async function initializeQueues() {
       
       try {
         queues[queueKey] = new Bull(queueConfig.name, {
-          redis: REDIS_URL,
+          redis: buildRedisConfig(REDIS_URL),
           prefix: REDIS_PREFIX,
           defaultJobOptions: queueConfig.defaultJobOptions
         });
