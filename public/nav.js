@@ -4,6 +4,32 @@ console.log('Nav.js loading...');
 // Global variables
 let authCheckInProgress = false;
 
+/**
+ * Fetch wrapper with basic retry/back-off.
+ * Retries network errors or 5xx once, otherwise resolves immediately.
+ */
+async function fetchWithRetry(url, options = {}, maxAttempts = 3, backoffMs = 250) {
+  let attempt = 0;
+  while (attempt < maxAttempts) {
+    try {
+      const res = await fetch(url, options);
+      // Retry on 5xx responses (server hiccups)
+      if (res.status >= 500 && res.status < 600) {
+        throw new Error(`Server ${res.status}`);
+      }
+      return res;
+    } catch (err) {
+      attempt += 1;
+      if (attempt >= maxAttempts) {
+        console.warn(`[nav.js] fetch ${url} failed after ${attempt} attempts`, err);
+        throw err;
+      }
+      console.log(`[nav.js] retrying ${url} (attempt ${attempt}/${maxAttempts})`);
+      await new Promise(r => setTimeout(r, backoffMs * attempt));
+    }
+  }
+}
+
 // Main navigation loading function
 async function loadNav() {
   try {
@@ -37,7 +63,7 @@ async function loadNav() {
     let userInfo = null;
 
     try {
-      const userResponse = await fetch('/api/user-info', {
+      const userResponse = await fetchWithRetry('/api/user-info', {
         credentials: 'include',
         headers: {
           'Cache-Control': 'no-cache',
@@ -45,17 +71,20 @@ async function loadNav() {
         }
       });
 
-      console.log('User info response status:', userResponse.status);
+      console.log('[nav.js] /api/user-info status:', userResponse.status);
 
       if (userResponse.ok) {
         userInfo = await userResponse.json();
         isAuthenticated = true;
         console.log('User authenticated:', userInfo.email);
+      } else if (userResponse.status === 401 || userResponse.status === 404) {
+        // Endpoint missing (404) or unauthenticated (401) – treat gracefully
+        console.log('[nav.js] Not authenticated or endpoint missing.');
       } else {
-        console.log('User not authenticated, status:', userResponse.status);
+        console.warn('[nav.js] Unexpected auth response', userResponse.status);
       }
     } catch (error) {
-      console.error('Auth check error:', error);
+      console.error('[nav.js] Auth check error (proceeding as guest):', error);
     }
 
     // Update navigation based on authentication status

@@ -77,6 +77,33 @@
 
   <script>
     /* ---------------------------------------------------------------------
+     *  Early auth-check – if the session cookie already exists
+     *  (for example immediately after successful signup) we’ll skip
+     *  this page entirely and go straight to onboarding.
+     * ------------------------------------------------------------------- */
+    async function checkExistingAuth() {
+      try {
+        console.log('[β-signup] Checking existing auth…');
+        const res = await fetch('/api/check-auth', {
+          credentials: 'include',
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          console.log('[β-signup] /api/check-auth →', data);
+          if (data.isAuthenticated) {
+            console.log('[β-signup] User already authenticated → redirecting');
+            window.location.replace('/beta-onboarding');
+            return true; // handled
+          }
+        }
+      } catch (err) {
+        console.warn('[β-signup] Auth check failed (continuing)', err);
+      }
+      return false;
+    }
+
+    /* ---------------------------------------------------------------------
      *  Toast helpers
      * ------------------------------------------------------------------- */
     function showToast(type, message) {
@@ -221,8 +248,13 @@ toast.innerHTML = `
      *  Init – attach event listener after DOM is ready
      * ------------------------------------------------------------------- */
     document.addEventListener('DOMContentLoaded', () => {
-      document.getElementById('beta-signup-form')
-              .addEventListener('submit', handleBetaSignup);
+      // If user is already logged-in (e.g. after refresh) skip form
+      checkExistingAuth().then(alreadyAuth => {
+        if (alreadyAuth) return; // redirected
+        console.log('[β-signup] No active session – binding form listener');
+        document.getElementById('beta-signup-form')
+                .addEventListener('submit', handleBetaSignup);
+      });
     });
   </script>
 </body>
