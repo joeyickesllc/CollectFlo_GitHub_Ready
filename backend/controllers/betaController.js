@@ -19,8 +19,12 @@ const logger = require('../services/logger');
  */
 exports.signup = async (req, res) => {
   try {
-    // Standardised field names (see securityMiddleware.validateSignup)
-    const { company_name, name, email, password } = req.body;
+    // Accept either camelCase or snake_case sent from the client. The
+    // security middleware already normalises these, but we keep this
+    // fallback to stay backward-compatible.
+    const company_name = req.body.company_name || req.body.companyName;  // ← NEW
+    const name        = req.body.name        || req.body.fullName;       // ← NEW
+    const { email, password } = req.body;                                // ← NEW
     
     // Validate required fields
     if (!company_name || !name || !email || !password) {
