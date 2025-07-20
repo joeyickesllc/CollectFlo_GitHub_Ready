@@ -1,0 +1,65 @@
+# robots.txt for CollectFlo
+# This file controls how search engines and other web crawlers access our site.
+# Previously, crawlers were receiving 404 errors when requesting this file.
+#
+# Last updated: July 20, 2025
+
+# Allow all well-behaved crawlers to access public content
+User-agent: *
+Allow: /
+Allow: /login
+Allow: /signup
+Allow: /beta
+Allow: /beta-signup
+Allow: /privacy
+Allow: /eula
+Allow: /help
+Allow: /*.html
+Allow: /*.css
+Allow: /*.js
+Allow: /*.svg
+Allow: /*.png
+Allow: /*.jpg
+Allow: /*.jpeg
+Allow: /*.webp
+Allow: /*.ico
+
+# Block access to API routes and sensitive areas
+Disallow: /api/
+Disallow: /admin/
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /templates
+Disallow: /onboarding
+Disallow: /beta-onboarding
+Disallow: /beta-stats
+
+# Specific rules for major crawlers
+# Google
+User-agent: Googlebot
+User-agent: Googlebot-Image
+User-agent: Googlebot-Mobile
+User-agent: Googlebot-News
+User-agent: Googlebot-Video
+Allow: /
+Disallow: /api/
+Crawl-delay: 1
+
+# Bing
+User-agent: Bingbot
+User-agent: BingPreview
+Allow: /
+Disallow: /api/
+Crawl-delay: 1
+
+# Meta/Facebook
+User-agent: facebookexternalhit
+User-agent: FacebookBot
+User-agent: meta-externalagent
+User-agent: meta-externalfetcher
+Allow: /
+Disallow: /api/
+Crawl-delay: 1
+
+# Sitemap location
+Sitemap: https://www.collectflo.com/sitemap.xml
