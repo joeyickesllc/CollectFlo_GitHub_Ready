@@ -33,6 +33,53 @@ const logger = require('../services/logger');
 router.use(logger.requestLogger);
 
 /**
+ * Authentication debug endpoint
+ * ---------------------------------------------------------------
+ * Returns detailed information about the current request/session.
+ * This route is intentionally placed BEFORE any auth-guarded
+ * routes or middleware so it always runs without interference.
+ *
+ * SECURITY NOTE:
+ *   • Only non-sensitive data is returned.
+ *   • Cookies are masked, authorisation headers are not exposed.
+ *   • Intended for temporary diagnostics; restrict in production.
+ */
+router.get('/auth-debug', async (req, res) => {
+  const sessionData = req.session || null;
+
+  const debugPayload = {
+    hasSession      : !!sessionData,
+    isAuthenticated : !!(sessionData && sessionData.user),
+    sessionId       : sessionData ? sessionData.id || null : null,
+    cookies         : (req.headers.cookie || '')
+                        .split(';')
+                        .map(c => c.trim())
+                        .filter(Boolean),
+    headers: {
+      ...req.headers,
+      cookie       : 'hidden for security',
+      authorization: req.headers.authorization ? 'present' : 'absent'
+    },
+    connectionInfo: {
+      ip         : req.ip,
+      protocol   : req.protocol,
+      secure     : req.secure,
+      hostname   : req.hostname,
+      method     : req.method,
+      originalUrl: req.originalUrl,
+    }
+  };
+
+  // Attach minimal user info when authenticated
+  if (sessionData && sessionData.user) {
+    const { id, email, role } = sessionData.user;
+    debugPayload.user = { id, email, role };
+  }
+
+  res.json(debugPayload);
+});
+
+/**
  * Authentication Routes
  */
 router.post(
