@@ -96,47 +96,94 @@ if (IS_PRODUCTION) {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Session configuration
-// Session store for express-session (PostgreSQL)
 // ---------------------------------------------------------------------------
-// Render’s managed Postgres requires SSL. In local development we disable it
-// so the connection works against a local DB without TLS.
-const pgSessionStore = new PgSession({
-  conString: process.env.DATABASE_URL,
-  // IMPORTANT:
-  // • Cloud providers (Render, Heroku, etc.) supply self-signed certs.
-  // • pg treats `ssl: true` as “validate certificates”.
-  // • `{ rejectUnauthorized: false }` enables TLS while skipping CA validation,
-  //   which is required for these managed databases.
-  ssl: (IS_PRODUCTION || IS_RENDER)
-    ? { rejectUnauthorized: false }   // enable SSL, skip CA validation
-    : false                           // disable SSL locally
-});
+// Session configuration
+// ---------------------------------------------------------------------------
 
-// Log/store errors explicitly so they never crash the app silently
-pgSessionStore.on('error', (err) => {
-  logger.error('Session store error', { error: err });
-});
+let sessionStore;   // will hold either PgSession or fallback MemoryStore
 
-app.set('trust proxy', 1); // ensure secure cookies behind proxy (Render)
+try {
+  logger.info('Initialising PostgreSQL session store…');
 
-app.use(session({
+  if (IS_PRODUCTION) {
+    // In production / Render always enable SSL but relax cert validation
+    const { Pool } = require('pg');
+    const pgPool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false }
+    });
+
+    // Connection test (non-blocking)
+    pgPool.query('SELECT 1', (err) => {
+      if (err) {
+        logger.error('PostgreSQL test query failed; sessions may fall back', { error: err });
+      } else {
+        logger.info('PostgreSQL connectivity verified for session store');
+      }
+    });
+
+    sessionStore = new PgSession({
+      pool: pgPool,
+      createTableIfMissing: true
+    });
+  } else {
+    // Development: simple connection string, no SSL
+    sessionStore = new PgSession({
+      conString: process.env.DATABASE_URL,
+      createTableIfMissing: true
+    });
+  }
+
+  sessionStore.on('error', (err) => {
+    logger.error('Session store error (PostgreSQL)', { error: err });
+  });
+} catch (err) {
+  // Catastrophic failure -> fall back to in-memory
+  logger.error('Failed to initialise PostgreSQL session store – falling back to MemoryStore', {
+    error: err.message,
+    stack: err.stack
+  });
+  const MemoryStore = require('memorystore')(session);
+  sessionStore = new MemoryStore({ checkPeriod: 8.64e7 }); // prune daily
+  logger.warn('USING IN-MEMORY SESSION STORE – sessions lost on restart');
+}
+
+// Always trust proxy so secure cookies & IP work correctly on Render
+app.set('trust proxy', 1);
+
+// Wrap session middleware to (a) skip static assets, (b) trap errors
+const baseSessionMiddleware = session({
   secret: SESSION_SECRET,
   resave: false,
-  // Always save a session so the cookie is set consistently
   saveUninitialized: true,
-  store: pgSessionStore,
+  store: sessionStore,
   cookie: {
-    secure  : IS_PRODUCTION,          // only true in prod/https
+    secure  : IS_PRODUCTION,
     httpOnly: true,
-    // Use Lax by default; switch to 'none' manually if your
-    // deployment requires cross-site cookies.
     sameSite: 'lax',
     domain  : process.env.COOKIE_DOMAIN || undefined,
     path    : '/',
-    maxAge  : parseInt(process.env.SESSION_TTL_MS || (24 * 60 * 60 * 1000), 10) // default 24h
+    maxAge  : parseInt(process.env.SESSION_TTL_MS || 86_400_000, 10) // 24h default
   }
-}));
+});
+
+app.use((req, res, next) => {
+  // Skip heavy session work for obvious static assets
+  if (req.path.match(/\.(css|js|png|jpg|jpeg|gif|svg|ico|woff2?|ttf|eot)$/i)) {
+    return next();
+  }
+  baseSessionMiddleware(req, res, (err) => {
+    if (err) {
+      logger.error('Session middleware failed to process request', {
+        path: req.path,
+        method: req.method,
+        error: err.message
+      });
+      return next(); // continue without a session rather than crashing
+    }
+    next();
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Page-visit tracking
