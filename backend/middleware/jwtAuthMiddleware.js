@@ -20,7 +20,7 @@ const logger = require('../services/logger');
  */
 function extractToken(req) {
   // Check Authorization header
-  const authHeader = req.headers.authorization;
+  const authHeader = req.headers.authorization || req.headers.Authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
     return authHeader.substring(7);
   }
@@ -28,6 +28,12 @@ function extractToken(req) {
   // Check cookies
   if (req.cookies && req.cookies.accessToken) {
     return req.cookies.accessToken;
+  }
+
+  // Fallback: support ?access_token= in query during debugging
+  if (req.query && req.query.access_token) {
+    logger.debug('extractToken: using access_token query param (debug mode)');
+    return req.query.access_token;
   }
   
   return null;
@@ -122,7 +128,20 @@ function optionalAuth(req, res, next) {
   const token = extractToken(req);
   
   if (!token) {
-    // No token, continue without authentication
+    // No JWT cookie / header – attempt legacy session-based auth for
+    // backward-compatibility while the front-end migrates.
+    if (req.session && req.session.user) {
+      logger.debug('optionalAuth: falling back to legacy session data');
+      req.user = {
+        id        : req.session.user.id,
+        email     : req.session.user.email,
+        role      : req.session.user.role,
+        company_id: req.session.user.company_id
+      };
+      return next();
+    }
+
+    logger.debug('optionalAuth: No token or session – continuing unauthenticated');
     return next();
   }
   
@@ -249,8 +268,15 @@ function setAuthCookies(res, accessToken, refreshToken) {
     httpOnly: true,
     secure: isProduction,
     sameSite: 'lax',
-    path: '/api/auth/refresh', // Restrict to refresh endpoint only
+    // Use root path so the cookie is sent to auth/check and other routes
+    path: '/',
     maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+  });
+
+  logger.debug('setAuthCookies: cookies set', {
+    accessTokenLen : accessToken?.length,
+    refreshTokenLen: refreshToken?.length,
+    path           : '/'
   });
 }
 
@@ -261,7 +287,9 @@ function setAuthCookies(res, accessToken, refreshToken) {
  */
 function clearAuthCookies(res) {
   res.clearCookie('accessToken', { path: '/' });
-  res.clearCookie('refreshToken', { path: '/api/auth/refresh' });
+  res.clearCookie('refreshToken', { path: '/' });
+
+  logger.debug('clearAuthCookies: cookies cleared');
 }
 
 /**

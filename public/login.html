@@ -200,6 +200,9 @@
           } catch(e){ dlog('session verify failed', e);}
           // Redirect to dashboard or specified redirect URL
           window.location.href = result.redirect || redirectUrl;
+        } else if (response.status === 401) {
+          // Invalid credentials
+          showError('Login Failed', 'Invalid email or password. Please try again.');
         } else if (response.status === 400 && result.errors?.length) {
           // Validation errors from server
           showError('Login Failed', result.errors[0].msg || 'Validation error. Please try again.');
