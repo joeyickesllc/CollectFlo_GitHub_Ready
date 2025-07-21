@@ -57,6 +57,7 @@ function extractRefreshToken(req) {
  * If authentication fails, returns 401 Unauthorized
  * 
  * @param {Object} req - Express request object
+ * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  * @param {Function} next - Express next function
  */
@@ -207,7 +208,7 @@ async function handleTokenRefresh(req, res) {
     const { accessToken, refreshToken: newRefreshToken } = jwtService.refreshTokens(refreshToken, user);
     
     // Set cookies
-    setAuthCookies(res, accessToken, newRefreshToken);
+    setAuthCookies(req, res, accessToken, newRefreshToken);
     
     return res.status(200).json({
       success: true,
@@ -247,23 +248,24 @@ async function getUserFromDatabase(userId) {
 /**
  * Set authentication cookies
  * 
+ * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  * @param {String} accessToken - JWT access token
  * @param {String} refreshToken - JWT refresh token
- */
-function setAuthCookies(res, accessToken, refreshToken) {
+*/
+function setAuthCookies(req, res, accessToken, refreshToken) {
   // In tests or non-Express contexts `res.cookie` may be undefined. Simply
   // skip cookie creation to avoid blowing up the request handler.
   if (typeof res.cookie !== 'function') {
     logger.debug('Response object missing cookie function; skipping auth cookies');
     return;
   }
-  const isProduction = process.env.NODE_ENV === 'production';
-  
+  const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
+
   // Set access token cookie
   res.cookie('accessToken', accessToken, {
     httpOnly: true,
-    secure: isProduction,
+    secure: isSecure,
     sameSite: 'lax',
     path: '/',
     maxAge: 30 * 60 * 1000 // 30 minutes
@@ -272,7 +274,7 @@ function setAuthCookies(res, accessToken, refreshToken) {
   // Set refresh token cookie
   res.cookie('refreshToken', refreshToken, {
     httpOnly: true,
-    secure: isProduction,
+    secure: isSecure,
     sameSite: 'lax',
     // Use root path so the cookie is sent to auth/check and other routes
     path: '/',
