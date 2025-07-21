@@ -97,9 +97,13 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Session configuration
+// Session store for express-session (PostgreSQL)
+// ---------------------------------------------------------------------------
+// Render’s managed Postgres requires SSL. In local development we disable it
+// so the connection works against a local DB without TLS.
 const pgSessionStore = new PgSession({
   conString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  ssl: (IS_PRODUCTION || IS_RENDER) ? true : false   // `true` lets pg enable TLS
 });
 
 // Log/store errors explicitly so they never crash the app silently
