@@ -181,7 +181,7 @@
       try {
         dlog('submitting', formData);
 
-        const response = await fetchWithRetry('/api/auth/login', {
+        const response = await fetchWithRetry('/api/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData)
@@ -195,7 +195,7 @@
         if (response.ok && result.success) {
           // Extra check that session is active
           try {
-            const verify = await fetchWithRetry('/api/user-info', { headers:{'Cache-Control':'no-cache'} });
+            const verify = await fetchWithRetry('/api/auth/check', { headers:{ 'Cache-Control': 'no-cache' } });
             dlog('session verify', verify.status);
           } catch(e){ dlog('session verify failed', e);}
           // Redirect to dashboard or specified redirect URL
