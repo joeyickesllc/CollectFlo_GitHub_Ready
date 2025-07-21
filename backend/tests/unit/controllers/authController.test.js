@@ -99,12 +99,11 @@ describe('Auth Controller - Login', () => {
     expect(bcrypt.compare).toHaveBeenCalledWith('correctPassword', 'hashedPassword');
     expect(jwtService.generateAccessToken).toHaveBeenCalledWith(mockUser);
     expect(jwtService.generateRefreshToken).toHaveBeenCalledWith(mockUser);
-    expect(setAuthCookies).toHaveBeenCalledWith(res, 'access-token', 'refresh-token');
+    expect(setAuthCookies).toHaveBeenCalledWith(req, res, 'access-token', 'refresh-token');
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({
       success: true,
       message: 'Login successful',
-      redirect: '/dashboard',
       user: {
         id: 1,
         email: 'test@example.com',
