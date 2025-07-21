@@ -13,6 +13,8 @@ const morgan = require('morgan');
 const cors = require('cors');
 const multer = require('multer');
 const { applySecurityMiddleware } = require('./backend/middleware/securityMiddleware');
+const cookieParser = require('cookie-parser');   // <-- added
+const { optionalAuth } = require('./backend/middleware/jwtAuthMiddleware'); // new import
 
 // Application modules
 const db = require('./backend/db/connection');
@@ -96,6 +98,12 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ---------------------------------------------------------------------------
+// Cookie parsing middleware (must run BEFORE session middleware so that
+// signed cookies such as accessToken / refreshToken are available)
+// ---------------------------------------------------------------------------
+app.use(cookieParser(SESSION_SECRET));
+
+// ---------------------------------------------------------------------------
 // Session configuration  (simple, memory-based for maximum reliability)
 // ---------------------------------------------------------------------------
 // NOTE:
@@ -152,6 +160,14 @@ app.get('/', (req, res) => {
 app.use(express.static(path.join(__dirname, 'public')));
 
 // API routes
+
+// ---------------------------------------------------------------------------
+// Inject optionalAuth ONLY for the auth-debug endpoint so that downstream
+// handler has access to req.user when available, without enforcing auth.
+// Must be registered before the main /api router for correct order.
+// ---------------------------------------------------------------------------
+app.use('/api/auth-debug', optionalAuth);
+
 app.use('/api', apiRoutes);
 
 // QuickBooks OAuth routes
@@ -192,8 +208,11 @@ const htmlRoutes = [
 htmlRoutes.forEach(route => {
   app.get(route.path, (req, res) => {
     // Check if route requires authentication
-    if (route.auth && !req.session.user) {
-      return res.redirect('/login?redirect=' + encodeURIComponent(req.path));
+    if (route.auth) {
+      const hasToken = req.cookies && req.cookies.accessToken;
+      if (!hasToken) {
+        return res.redirect('/login?redirect=' + encodeURIComponent(req.path));
+      }
     }
     
     res.sendFile(path.join(__dirname, 'public', route.file));

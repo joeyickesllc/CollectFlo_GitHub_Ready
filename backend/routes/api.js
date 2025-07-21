@@ -18,7 +18,10 @@ const betaController = require('../controllers/betaController');
 // const testController = require('../controllers/testController');
 
 // Import middleware
-const { requireAuth } = require('../middleware/authMiddleware');
+const {
+  requireAuth,
+  optionalAuth,
+} = require('../middleware/jwtAuthMiddleware');
 const errorMiddleware = require('../middleware/errorMiddleware');
 const { trackPageVisit, trackBetaSignup, trackLogin, trackUserAction } = require('../middleware/trackingMiddleware');
 const {
@@ -28,6 +31,44 @@ const {
   signupRateLimiter,
 } = require('../middleware/securityMiddleware');
 const logger = require('../services/logger');
+
+// Mount dedicated authentication routes (JWT-based)
+const authRoutes = require('./authRoutes');
+router.use('/auth', authRoutes);
+
+/**
+ * ---------------------------------------------------------------------------
+ * Back-compat Authentication Endpoints
+ * ---------------------------------------------------------------------------
+ * Older front-end builds may still call the original top-level auth URLs
+ * (/api/login, /api/signup, /api/logout, /api/check-auth).  These wrappers
+ * delegate to the new JWT-based `/api/auth/*` handlers so we can migrate the
+ * front-end incrementally without breaking existing clients.
+ */
+
+// POST /api/login  →  /api/auth/login
+router.post(
+  '/login',
+  authRateLimiter,
+  validateLogin,
+  trackLogin,
+  (req, res, next) => authController.login(req, res, next)
+);
+
+// POST /api/signup → /api/auth/signup
+router.post(
+  '/signup',
+  signupRateLimiter,
+  validateSignup,
+  trackUserAction('user_signup'),
+  (req, res, next) => authController.signup(req, res, next)
+);
+
+// POST /api/logout → /api/auth/logout
+router.post('/logout', (req, res, next) => authController.logout(req, res, next));
+
+// GET  /api/check-auth → /api/auth/check
+router.get('/check-auth', (req, res, next) => authController.checkAuth(req, res, next));
 
 // Apply request logger middleware to all API routes
 router.use(logger.requestLogger);
@@ -45,12 +86,9 @@ router.use(logger.requestLogger);
  *   • Intended for temporary diagnostics; restrict in production.
  */
 router.get('/auth-debug', async (req, res) => {
-  const sessionData = req.session || null;
-
   const debugPayload = {
-    hasSession      : !!sessionData,
-    isAuthenticated : !!(sessionData && sessionData.user),
-    sessionId       : sessionData ? sessionData.id || null : null,
+    hasToken        : !!(req.cookies?.accessToken || req.headers.authorization),
+    isAuthenticated : !!req.user,
     cookies         : (req.headers.cookie || '')
                         .split(';')
                         .map(c => c.trim())
@@ -71,57 +109,12 @@ router.get('/auth-debug', async (req, res) => {
   };
 
   // Attach minimal user info when authenticated
-  if (sessionData && sessionData.user) {
-    const { id, email, role } = sessionData.user;
+  if (req.user) {
+    const { id, email, role } = req.user;
     debugPayload.user = { id, email, role };
   }
 
   res.json(debugPayload);
-});
-
-/**
- * Authentication Routes
- */
-router.post(
-  '/login',
-  authRateLimiter,          // Protect against brute-force
-  validateLogin,            // Input validation / sanitisation
-  trackLogin,               // Track successful / failed attempts
-  async (req, res, next) => {
-  try {
-    await authController.login(req, res);
-  } catch (error) {
-    next(error);
-  }
-});
-
-router.post(
-  '/signup',
-  signupRateLimiter,        // Limit account creation
-  validateSignup,           // Validate & sanitise input
-  trackUserAction('user_signup'),
-  async (req, res, next) => {
-  try {
-    await authController.signup(req, res);
-  } catch (error) {
-    next(error);
-  }
-});
-
-router.post('/logout', async (req, res, next) => {
-  try {
-    await authController.logout(req, res);
-  } catch (error) {
-    next(error);
-  }
-});
-
-router.get('/check-auth', async (req, res, next) => {
-  try {
-    await authController.checkAuth(req, res);
-  } catch (error) {
-    next(error);
-  }
 });
 
 /**
@@ -130,14 +123,14 @@ router.get('/check-auth', async (req, res, next) => {
  * Front-end (nav.js) expects `/api/user-info` to return 200 with the
  * user object when a session exists, or 401 when not authenticated.
  */
-router.get('/user-info', async (req, res, next) => {
+router.get('/user-info', optionalAuth, async (req, res, next) => {
   try {
-    if (req.session && req.session.user) {
+    if (req.user) {
       // Only expose non-sensitive fields
-      const { id, email, name, role } = req.session.user;
+      const { id, email, role } = req.user;
       return res.status(200).json({
         success: true,
-        user: { id, email, name, role }
+        user: { id, email, role }
       });
     }
 

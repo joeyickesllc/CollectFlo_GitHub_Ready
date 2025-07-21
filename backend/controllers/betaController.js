@@ -8,6 +8,11 @@
 const bcrypt = require('bcryptjs');
 const db = require('../db/connection');
 const logger = require('../services/logger');
+const jwtService = require('../services/jwtService');
+const {
+  setAuthCookies,
+  clearAuthCookies
+} = require('../middleware/jwtAuthMiddleware');
 
 /**
  * Beta Program Signup
@@ -84,50 +89,31 @@ exports.signup = async (req, res) => {
       };
     });
     
-    // Create session for auto-login
-    req.session.user = {
-      id: result.user.id,
-      email: result.user.email,
-      name: result.user.name,
-      company_id: result.companyId,
-      role: result.user.role,
-      is_beta: true
-    };
-    
-    /* --------------------------------------------------------------
-     * Ensure the session is fully saved before sending the response.
-     * This prevents race-conditions where the cookie is issued before
-     * the session row is actually persisted in the store.
-     * ------------------------------------------------------------ */
-    req.session.save((err) => {
-      if (err) {
-        logger.error('Session save error during beta signup', { error: err, userId: result.user.id });
-        return res.status(500).json({
-          success: false,
-          message: 'Failed to create session'
-        });
+    // ------------------------------------------------------------------
+    // Generate JWT tokens & set secure cookies
+    // ------------------------------------------------------------------
+    const accessToken  = jwtService.generateAccessToken(result.user);
+    const refreshToken = jwtService.generateRefreshToken(result.user);
+    setAuthCookies(res, accessToken, refreshToken);
+
+    // Log beta signup
+    logger.info(`New beta user signed up: ${email} for company: ${company_name}`, { 
+      userId: result.user.id,
+      isBeta: true
+    });
+
+    // Return success
+    return res.status(201).json({
+      success: true,
+      message: 'Beta signup successful',
+      redirect: '/beta-onboarding',
+      user: {
+        id: result.user.id,
+        email: result.user.email,
+        name: result.user.name,
+        role: result.user.role,
+        is_beta: true
       }
-
-      // Log beta signup (after session is confirmed saved)
-      logger.info(`New beta user signed up: ${email} for company: ${company_name}`, { 
-        userId: result.user.id,
-        isBeta: true,
-        sessionSaved: true
-      });
-
-      // Return success
-      return res.status(201).json({
-        success: true,
-        message: 'Beta signup successful',
-        redirect: '/beta-onboarding',
-        user: {
-          id: result.user.id,
-          email: result.user.email,
-          name: result.user.name,
-          role: result.user.role,
-          is_beta: true
-        }
-      });
     });
   } catch (error) {
     logger.error('Beta signup error:', { error });

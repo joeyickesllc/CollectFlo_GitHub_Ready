@@ -8,6 +8,11 @@
 const bcrypt = require('bcryptjs');
 const db = require('../db/connection');
 const logger = require('../services/logger');
+const jwtService = require('../services/jwtService');
+const {
+  setAuthCookies,
+  clearAuthCookies
+} = require('../middleware/jwtAuthMiddleware');
 
 /**
  * User login
@@ -57,45 +62,25 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Create session
-    req.session.user = {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      company_id: user.company_id,
-      role: user.role
-    };
+    // ------------------------------------------------------------------
+    // Generate JWT tokens & set secure cookies
+    // ------------------------------------------------------------------
+    const accessToken  = jwtService.generateAccessToken(user);
+    const refreshToken = jwtService.generateRefreshToken(user);
+    setAuthCookies(res, accessToken, refreshToken);
 
-    // Explicitly save the session before responding to ensure the cookie
-    // is fully written and persisted in the session store.
-    req.session.save((err) => {
-      if (err) {
-        logger.error('Session save error during login', { error: err, userId: user.id });
-        return res.status(500).json({ 
-          success: false, 
-          message: 'Failed to create session' 
-        });
+    logger.info('User logged in', { userId: user.id, email: user.email });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Login successful',
+      redirect,
+      user: {
+        id   : user.id,
+        email: user.email,
+        name : user.name,
+        role : user.role
       }
-
-      // Log login activity once session is confirmed saved
-      logger.info(`User logged in: ${user.email}`, { 
-        userId: user.id,
-        redirect,
-        sessionSaved: true 
-      });
-      
-      // Return success
-      return res.status(200).json({
-        success: true,
-        message: 'Login successful',
-        redirect,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role
-        }
-      });
     });
   } catch (error) {
     logger.error('Login error:', { error });
@@ -182,27 +167,23 @@ exports.signup = async (req, res) => {
       };
     });
 
-    // Create session
-    req.session.user = {
-      id: result.user.id,
-      email: result.user.email,
-      name: result.user.name,
-      company_id: result.companyId,
-      role: result.user.role
-    };
+    // ------------------------------------------------------------------
+    // Generate JWT tokens & set cookies
+    // ------------------------------------------------------------------
+    const accessToken  = jwtService.generateAccessToken(result.user);
+    const refreshToken = jwtService.generateRefreshToken(result.user);
+    setAuthCookies(res, accessToken, refreshToken);
 
-    // Log signup
-    logger.info(`New user signed up: ${email} for company: ${company_name}`, { userId: result.user.id });
+    logger.info('New user signed up', { userId: result.user.id, email: email });
 
-    // Return success
     return res.status(201).json({
       success: true,
       message: 'Signup successful',
       user: {
-        id: result.user.id,
+        id   : result.user.id,
         email: result.user.email,
-        name: result.user.name,
-        role: result.user.role
+        name : result.user.name,
+        role : result.user.role
       }
     });
   } catch (error) {
@@ -224,29 +205,17 @@ exports.signup = async (req, res) => {
  */
 exports.logout = (req, res) => {
   try {
-    // Log the logout if user exists in session
-    if (req.session.user) {
-      logger.info(`User logged out: ${req.session.user.email}`, { userId: req.session.user.id });
-    }
+    const accessToken  = req.cookies?.accessToken || null;
+    const refreshToken = req.cookies?.refreshToken || null;
 
-    // Destroy session
-    req.session.destroy(err => {
-      if (err) {
-        logger.error('Session destruction error:', { error: err });
-        return res.status(500).json({ 
-          success: false, 
-          message: 'An error occurred during logout' 
-        });
-      }
+    jwtService.logout(accessToken, refreshToken);
+    clearAuthCookies(res);
 
-      // Clear cookie
-      res.clearCookie('connect.sid');
-      
-      // Return success
-      return res.status(200).json({
-        success: true,
-        message: 'Logout successful'
-      });
+    logger.info('User logged out');
+
+    return res.status(200).json({
+      success: true,
+      message: 'Logout successful'
     });
   } catch (error) {
     logger.error('Logout error:', { error });
@@ -266,22 +235,27 @@ exports.logout = (req, res) => {
  * @param {Object} res - Express response object
  */
 exports.checkAuth = (req, res) => {
-  if (req.session && req.session.user) {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = jwtService.extractTokenFromHeader(authHeader) || req.cookies?.accessToken;
+
+    if (!token) {
+      return res.status(200).json({ success: true, isAuthenticated: false });
+    }
+
+    const decoded = jwtService.verifyToken(token, 'access');
+
     return res.status(200).json({
       success: true,
       isAuthenticated: true,
       user: {
-        id: req.session.user.id,
-        email: req.session.user.email,
-        name: req.session.user.name,
-        role: req.session.user.role
+        id   : decoded.sub,
+        email: decoded.email,
+        role : decoded.role
       }
     });
-  } else {
-    return res.status(200).json({
-      success: true,
-      isAuthenticated: false
-    });
+  } catch {
+    return res.status(200).json({ success: true, isAuthenticated: false });
   }
 };
 
