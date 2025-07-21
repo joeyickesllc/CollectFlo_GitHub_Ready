@@ -96,47 +96,93 @@ if (IS_PRODUCTION) {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Session configuration
-// Session store for express-session (PostgreSQL)
 // ---------------------------------------------------------------------------
-// Render’s managed Postgres requires SSL. In local development we disable it
-// so the connection works against a local DB without TLS.
-const pgSessionStore = new PgSession({
-  conString: process.env.DATABASE_URL,
-  // IMPORTANT:
-  // • Cloud providers (Render, Heroku, etc.) supply self-signed certs.
-  // • pg treats `ssl: true` as “validate certificates”.
-  // • `{ rejectUnauthorized: false }` enables TLS while skipping CA validation,
-  //   which is required for these managed databases.
-  ssl: (IS_PRODUCTION || IS_RENDER)
-    ? { rejectUnauthorized: false }   // enable SSL, skip CA validation
-    : false                           // disable SSL locally
-});
+// Session configuration
+// ---------------------------------------------------------------------------
 
-// Log/store errors explicitly so they never crash the app silently
-pgSessionStore.on('error', (err) => {
-  logger.error('Session store error', { error: err });
-});
+let sessionStore; // PgSession or MemoryStore fallback
 
-app.set('trust proxy', 1); // ensure secure cookies behind proxy (Render)
+try {
+  logger.info('Initializing PostgreSQL session store…');
 
-app.use(session({
+  if (IS_PRODUCTION) {
+    // Production / Render – explicit Pool with relaxed-cert SSL
+    const { Pool } = require('pg');
+    const pgPool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false }
+    });
+
+    // quick connectivity probe (non-blocking)
+    pgPool.query('SELECT 1', (err) => {
+      if (err) {
+        logger.error('PostgreSQL connectivity check failed', { error: err.message });
+      } else {
+        logger.info('PostgreSQL connectivity verified');
+      }
+    });
+
+    sessionStore = new PgSession({
+      pool: pgPool,
+      createTableIfMissing: true
+    });
+  } else {
+    // Development – simple connection string, no SSL
+    sessionStore = new PgSession({
+      conString: process.env.DATABASE_URL,
+      createTableIfMissing: true
+    });
+  }
+
+  sessionStore.on('error', (err) => {
+    logger.error('Session store error', { error: err.message });
+  });
+} catch (err) {
+  // Fallback: in-memory store to keep app alive
+  logger.error('PostgreSQL session store init failed – falling back to MemoryStore', {
+    error: err.message,
+    stack: err.stack
+  });
+  const MemoryStore = require('memorystore')(session);
+  sessionStore = new MemoryStore({ checkPeriod: 86_400_000 }); // prune daily
+  logger.warn('USING IN-MEMORY SESSION STORE – sessions lost on restart');
+}
+
+// Ensure secure cookies behind Render’s proxy
+app.set('trust proxy', 1);
+
+const sessionMiddleware = session({
   secret: SESSION_SECRET,
   resave: false,
-  // Always save a session so the cookie is set consistently
   saveUninitialized: true,
-  store: pgSessionStore,
+  store: sessionStore,
   cookie: {
-    secure  : IS_PRODUCTION,          // only true in prod/https
+    secure: IS_PRODUCTION,
     httpOnly: true,
-    // Use Lax by default; switch to 'none' manually if your
-    // deployment requires cross-site cookies.
     sameSite: 'lax',
-    domain  : process.env.COOKIE_DOMAIN || undefined,
-    path    : '/',
-    maxAge  : parseInt(process.env.SESSION_TTL_MS || (24 * 60 * 60 * 1000), 10) // default 24h
+    domain: process.env.COOKIE_DOMAIN || undefined,
+    path: '/',
+    maxAge: parseInt(process.env.SESSION_TTL_MS || 86_400_000, 10) // 24 h default
   }
-}));
+});
+
+// Apply middleware with asset-skip + graceful error handling
+app.use((req, res, next) => {
+  if (req.path.match(/\.(css|js|png|jpg|jpeg|gif|svg|ico|woff2?|woff|ttf|eot)$/i)) {
+    return next();
+  }
+  sessionMiddleware(req, res, (err) => {
+    if (err) {
+      logger.error('Session middleware error – continuing without session', {
+        path: req.path,
+        method: req.method,
+        error: err.message
+      });
+      return next();
+    }
+    next();
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Page-visit tracking
