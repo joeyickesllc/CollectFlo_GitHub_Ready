@@ -10,7 +10,7 @@
  */
 
 const bcrypt = require('bcryptjs');
-const { login } = require('../../../controllers/authController');
+const { login, changePassword } = require('../../../controllers/authController');
 
 jest.mock('../../../middleware/jwtAuthMiddleware', () => ({
   setAuthCookies: jest.fn(),
@@ -294,5 +294,56 @@ describe('Auth Controller - Login', () => {
       'Login error:',
       expect.objectContaining({ error: bcryptError })
     );
+  });
+});
+
+describe('Auth Controller - Change Password', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const mockRequest = (body = {}, user = null) => ({
+    body,
+    session: {},
+    user
+  });
+
+  const mockResponse = () => {
+    const res = {};
+    res.status = jest.fn().mockReturnValue(res);
+    res.json = jest.fn().mockReturnValue(res);
+    return res;
+  };
+
+  test('should change password using JWT user when session is missing', async () => {
+    const user = { id: 5, email: 'test@example.com', role: 'admin', company_id: 1 };
+
+    const req = mockRequest({ currentPassword: 'old', newPassword: 'newPassword1' }, user);
+    const res = mockResponse();
+
+    db.queryOne.mockResolvedValueOnce({ password: 'hashedOld' });
+    bcrypt.compare.mockResolvedValueOnce(true);
+    bcrypt.hash.mockResolvedValueOnce('hashedNew');
+    db.execute.mockResolvedValueOnce({});
+
+    await changePassword(req, res);
+
+    expect(db.queryOne).toHaveBeenCalledWith('SELECT password FROM users WHERE id = $1', [user.id]);
+    expect(db.execute).toHaveBeenCalledWith(
+      'UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2',
+      ['hashedNew', user.id]
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ success: true, message: 'Password changed successfully' });
+  });
+
+  test('should return 401 when user is not authenticated', async () => {
+    const req = mockRequest({ currentPassword: 'a', newPassword: 'b' }, null);
+    const res = mockResponse();
+
+    await changePassword(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ success: false, message: 'Authentication required' });
   });
 });
