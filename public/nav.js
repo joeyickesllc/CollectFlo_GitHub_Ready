@@ -37,7 +37,7 @@ async function loadNav() {
     let userInfo = null;
 
     try {
-      const userResponse = await fetch('/api/user-info', {
+      const userResponse = await fetch('/api/auth/check', {
         credentials: 'include',
         headers: {
           'Cache-Control': 'no-cache',
@@ -48,9 +48,14 @@ async function loadNav() {
       console.log('User info response status:', userResponse.status);
 
       if (userResponse.ok) {
-        userInfo = await userResponse.json();
-        isAuthenticated = true;
-        console.log('User authenticated:', userInfo.email);
+        const data = await userResponse.json();
+        if (data.isAuthenticated) {
+          userInfo = data.user;
+          isAuthenticated = true;
+          console.log('User authenticated:', userInfo.email);
+        } else {
+          console.log('User not authenticated (flag false)');
+        }
       } else {
         console.log('User not authenticated, status:', userResponse.status);
       }
