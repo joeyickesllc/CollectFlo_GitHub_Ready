@@ -51,7 +51,7 @@ function initScheduler() {
       logger.info('Running scheduled invoice sync');
       try {
         // Queue the sync job to be processed by the job queue
-        await jobQueue.add('syncInvoices', {
+        await jobQueue.add('sync', {
           timestamp: new Date().toISOString()
         });
         logger.info('Invoice sync job queued successfully');
