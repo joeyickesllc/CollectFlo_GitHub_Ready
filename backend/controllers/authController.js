@@ -2,7 +2,7 @@
  * Authentication Controller
  * 
  * Handles user authentication operations including login, signup, and logout.
- * Works with express-session for session management and bcryptjs for password security.
+ * Uses JSON Web Tokens (JWTs) stored in HTTP-only cookies for authentication and bcryptjs for password security.
  */
 
 const bcrypt = require('bcryptjs');
