@@ -1,6 +1,41 @@
 // Navigation loading and authentication handling
 console.log('Nav.js loading...');
 
+/* ------------------------------------------------------------------
+ * Minimal anti-reload guard
+ * ------------------------------------------------------------------
+ * Detects excessive reloads of the same path within a short window and
+ * aborts nav initialisation to break potential loops.
+ */
+(() => {
+  const PATH_KEY   = `nav_rl_${window.location.pathname}`;
+  const WINDOW_MS  = 5000;   // 5-second sliding window
+  const THRESHOLD  = 5;      // more than 5 loads in WINDOW_MS ⇒ abort
+
+  try {
+    const now  = Date.now();
+    const info = JSON.parse(sessionStorage.getItem(PATH_KEY) || '{}');
+    if (!info.ts || now - info.ts > WINDOW_MS) {
+      // Reset counter for a new window
+      sessionStorage.setItem(PATH_KEY, JSON.stringify({ ts: now, cnt: 1 }));
+    } else {
+      info.cnt = (info.cnt || 0) + 1;
+      info.ts  = now;
+      sessionStorage.setItem(PATH_KEY, JSON.stringify(info));
+      if (info.cnt > THRESHOLD) {
+        console.warn(
+          `[nav.js] Reload loop detected (${info.cnt} loads in ${WINDOW_MS /
+            1000}s). Aborting nav initialisation.`
+        );
+        return; // Stop executing the rest of nav.js
+      }
+    }
+  } catch (e) {
+    // Fail-open on any sessionStorage issues
+    console.debug('[nav.js] Anti-reload guard error:', e);
+  }
+})();
+
 // Global variables
 let authCheckInProgress = false;
 
