@@ -14,6 +14,18 @@
 const bcrypt = require('bcryptjs');
 const { signup } = require('../../../controllers/betaController');
 
+jest.mock('../../../middleware/jwtAuthMiddleware', () => ({
+  setAuthCookies: jest.fn(),
+  clearAuthCookies: jest.fn(),
+}));
+jest.mock('../../../services/jwtService', () => ({
+  generateAccessToken: jest.fn(() => 'access-token'),
+  generateRefreshToken: jest.fn(() => 'refresh-token'),
+}));
+
+const { setAuthCookies } = require('../../../middleware/jwtAuthMiddleware');
+const jwtService = require('../../../services/jwtService');
+
 // Mock dependencies
 jest.mock('bcryptjs');
 jest.mock('../../../db/connection', () => ({
@@ -92,21 +104,16 @@ describe('Beta Controller - Signup', () => {
     expect(bcrypt.hash).toHaveBeenCalledWith('securepassword', 10);
     expect(db.transaction).toHaveBeenCalled();
     
-    // Check session creation
-    expect(req.session.user).toEqual({
-      id: 1,
-      email: 'beta@example.com',
-      name: 'Beta User',
-      company_id: 2,
-      role: 'admin',
-      is_beta: true
-    });
+    expect(jwtService.generateAccessToken).toHaveBeenCalledWith(mockTransactionResult.user);
+    expect(jwtService.generateRefreshToken).toHaveBeenCalledWith(mockTransactionResult.user);
+    expect(setAuthCookies).toHaveBeenCalledWith(res, 'access-token', 'refresh-token');
     
     // Check response
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.json).toHaveBeenCalledWith({
       success: true,
       message: 'Beta signup successful',
+      redirect: '/beta-onboarding',
       user: {
         id: 1,
         email: 'beta@example.com',
@@ -358,7 +365,7 @@ describe('Beta Controller - Signup', () => {
     );
   });
 
-  test('should create session with correct user data after successful signup', async () => {
+  test('should set auth cookies after successful signup', async () => {
     // Setup mock transaction result
     const mockTransactionResult = {
       user: {
@@ -386,15 +393,8 @@ describe('Beta Controller - Signup', () => {
     // Call the function
     await signup(req, res);
     
-    // Assertions specifically for session creation
-    expect(req.session.user).toBeDefined();
-    expect(req.session.user).toEqual({
-      id: 5,
-      email: 'session@example.com',
-      name: 'Session Test',
-      company_id: 10,
-      role: 'admin',
-      is_beta: true
-    });
+    expect(jwtService.generateAccessToken).toHaveBeenCalledWith(mockTransactionResult.user);
+    expect(jwtService.generateRefreshToken).toHaveBeenCalledWith(mockTransactionResult.user);
+    expect(setAuthCookies).toHaveBeenCalledWith(res, 'access-token', 'refresh-token');
   });
 });
