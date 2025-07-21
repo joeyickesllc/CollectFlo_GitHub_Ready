@@ -106,14 +106,13 @@ describe('Beta Controller - Signup', () => {
     
     expect(jwtService.generateAccessToken).toHaveBeenCalledWith(mockTransactionResult.user);
     expect(jwtService.generateRefreshToken).toHaveBeenCalledWith(mockTransactionResult.user);
-    expect(setAuthCookies).toHaveBeenCalledWith(res, 'access-token', 'refresh-token');
+    expect(setAuthCookies).toHaveBeenCalledWith(req, res, 'access-token', 'refresh-token');
     
     // Check response
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.json).toHaveBeenCalledWith({
       success: true,
       message: 'Beta signup successful',
-      redirect: '/beta-onboarding',
       user: {
         id: 1,
         email: 'beta@example.com',
@@ -395,6 +394,6 @@ describe('Beta Controller - Signup', () => {
     
     expect(jwtService.generateAccessToken).toHaveBeenCalledWith(mockTransactionResult.user);
     expect(jwtService.generateRefreshToken).toHaveBeenCalledWith(mockTransactionResult.user);
-    expect(setAuthCookies).toHaveBeenCalledWith(res, 'access-token', 'refresh-token');
+    expect(setAuthCookies).toHaveBeenCalledWith(req, res, 'access-token', 'refresh-token');
   });
 });

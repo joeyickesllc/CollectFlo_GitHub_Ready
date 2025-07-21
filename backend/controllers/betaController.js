@@ -94,7 +94,7 @@ exports.signup = async (req, res) => {
     // ------------------------------------------------------------------
     const accessToken  = jwtService.generateAccessToken(result.user);
     const refreshToken = jwtService.generateRefreshToken(result.user);
-    setAuthCookies(res, accessToken, refreshToken);
+    setAuthCookies(req, res, accessToken, refreshToken);
 
     // Create session for backwards compatibility with session-based code
     req.session.user = {
