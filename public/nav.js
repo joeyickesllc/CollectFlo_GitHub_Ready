@@ -75,9 +75,9 @@ async function loadNav() {
 
       if (userResponse.ok) {
         const data = await userResponse.json().catch(() => ({}));
-        if (data.isAuthenticated) {
-          userInfo = data.user;
-          isAuthenticated = true;
+        isAuthenticated = !!data.isAuthenticated;
+        if (isAuthenticated) {
+          userInfo = data.user || null;
           console.log('User authenticated:', userInfo?.email);
         } else {
           console.log('[nav.js] Auth check returned isAuthenticated = false');
