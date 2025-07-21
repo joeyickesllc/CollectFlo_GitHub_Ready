@@ -97,19 +97,33 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Session configuration
+const pgSessionStore = new PgSession({
+  conString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
+
+// Log/store errors explicitly so they never crash the app silently
+pgSessionStore.on('error', (err) => {
+  logger.error('Session store error', { error: err });
+});
+
+app.set('trust proxy', 1); // ensure secure cookies behind proxy (Render)
+
 app.use(session({
   secret: SESSION_SECRET,
   resave: false,
-  saveUninitialized: false,
-  store: new PgSession({
-    // Use same Postgres database as application
-    conString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
-  }),
+  // Always save a session so the cookie is set consistently
+  saveUninitialized: true,
+  store: pgSessionStore,
   cookie: {
-    secure: IS_PRODUCTION,
+    secure  : IS_PRODUCTION,          // only true in prod/https
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    // Use Lax by default; switch to 'none' manually if your
+    // deployment requires cross-site cookies.
+    sameSite: 'lax',
+    domain  : process.env.COOKIE_DOMAIN || undefined,
+    path    : '/',
+    maxAge  : parseInt(process.env.SESSION_TTL_MS || (24 * 60 * 60 * 1000), 10) // default 24h
   }
 }));
 

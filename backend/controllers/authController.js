@@ -66,20 +66,36 @@ exports.login = async (req, res) => {
       role: user.role
     };
 
-    // Log login activity
-    logger.info(`User logged in: ${user.email}`, { userId: user.id, redirect });
-    
-    // Return success
-    return res.status(200).json({
-      success: true,
-      message: 'Login successful',
-      redirect,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role
+    // Explicitly save the session before responding to ensure the cookie
+    // is fully written and persisted in the session store.
+    req.session.save((err) => {
+      if (err) {
+        logger.error('Session save error during login', { error: err, userId: user.id });
+        return res.status(500).json({ 
+          success: false, 
+          message: 'Failed to create session' 
+        });
       }
+
+      // Log login activity once session is confirmed saved
+      logger.info(`User logged in: ${user.email}`, { 
+        userId: user.id,
+        redirect,
+        sessionSaved: true 
+      });
+      
+      // Return success
+      return res.status(200).json({
+        success: true,
+        message: 'Login successful',
+        redirect,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role
+        }
+      });
     });
   } catch (error) {
     logger.error('Login error:', { error });

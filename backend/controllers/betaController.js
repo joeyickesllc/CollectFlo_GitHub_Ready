@@ -19,8 +19,12 @@ const logger = require('../services/logger');
  */
 exports.signup = async (req, res) => {
   try {
-    // Standardised field names (see securityMiddleware.validateSignup)
-    const { company_name, name, email, password } = req.body;
+    // Accept either camelCase or snake_case sent from the client. The
+    // security middleware already normalises these, but we keep this
+    // fallback to stay backward-compatible.
+    const company_name = req.body.company_name || req.body.companyName;  // ← NEW
+    const name        = req.body.name        || req.body.fullName;       // ← NEW
+    const { email, password } = req.body;                                // ← NEW
     
     // Validate required fields
     if (!company_name || !name || !email || !password) {
@@ -90,26 +94,40 @@ exports.signup = async (req, res) => {
       is_beta: true
     };
     
-    // Log beta signup
-    logger.info(`New beta user signed up: ${email} for company: ${company_name}`, { 
-      userId: result.user.id,
-      isBeta: true 
-    });
-    
-    // Return success
-    return res.status(201).json({
-      success: true,
-      message: 'Beta signup successful',
-      // Where the frontend should navigate after successful signup
-      // (kept generic; the client app can append query params if it wants)
-      redirect: '/beta-onboarding',
-      user: {
-        id: result.user.id,
-        email: result.user.email,
-        name: result.user.name,
-        role: result.user.role,
-        is_beta: true
+    /* --------------------------------------------------------------
+     * Ensure the session is fully saved before sending the response.
+     * This prevents race-conditions where the cookie is issued before
+     * the session row is actually persisted in the store.
+     * ------------------------------------------------------------ */
+    req.session.save((err) => {
+      if (err) {
+        logger.error('Session save error during beta signup', { error: err, userId: result.user.id });
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to create session'
+        });
       }
+
+      // Log beta signup (after session is confirmed saved)
+      logger.info(`New beta user signed up: ${email} for company: ${company_name}`, { 
+        userId: result.user.id,
+        isBeta: true,
+        sessionSaved: true
+      });
+
+      // Return success
+      return res.status(201).json({
+        success: true,
+        message: 'Beta signup successful',
+        redirect: '/beta-onboarding',
+        user: {
+          id: result.user.id,
+          email: result.user.email,
+          name: result.user.name,
+          role: result.user.role,
+          is_beta: true
+        }
+      });
     });
   } catch (error) {
     logger.error('Beta signup error:', { error });
