@@ -233,6 +233,12 @@ async function getUserFromDatabase(userId) {
  * @param {String} refreshToken - JWT refresh token
  */
 function setAuthCookies(res, accessToken, refreshToken) {
+  // In tests or non-Express contexts `res.cookie` may be undefined. Simply
+  // skip cookie creation to avoid blowing up the request handler.
+  if (typeof res.cookie !== 'function') {
+    logger.debug('Response object missing cookie function; skipping auth cookies');
+    return;
+  }
   const isProduction = process.env.NODE_ENV === 'production';
   
   // Set access token cookie
