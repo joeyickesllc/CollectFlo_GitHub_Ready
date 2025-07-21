@@ -12,8 +12,9 @@ const path = require('path');
 const morgan = require('morgan');
 const cors = require('cors');
 const multer = require('multer');
-const PgSession = require('connect-pg-simple')(session);
 const { applySecurityMiddleware } = require('./backend/middleware/securityMiddleware');
+const cookieParser = require('cookie-parser');   // <-- added
+const { optionalAuth } = require('./backend/middleware/jwtAuthMiddleware'); // new import
 
 // Application modules
 const db = require('./backend/db/connection');
@@ -97,91 +98,42 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ---------------------------------------------------------------------------
-// Session configuration
+// Cookie parsing middleware (must run BEFORE session middleware so that
+// signed cookies such as accessToken / refreshToken are available)
 // ---------------------------------------------------------------------------
+app.use(cookieParser(SESSION_SECRET));
 
-let sessionStore; // PgSession or MemoryStore fallback
+// ---------------------------------------------------------------------------
+// Session configuration  (simple, memory-based for maximum reliability)
+// ---------------------------------------------------------------------------
+// NOTE:
+// We intentionally use express-session's in-memory store.  This eliminates all
+// database-connection-related failures (e.g. SSL/TLS to PG) at the cost of
+// clearing sessions on server restart—acceptable for reliability.
 
-try {
-  logger.info('Initializing PostgreSQL session store…');
+app.set('trust proxy', 1); // secure cookies behind Render proxy
 
-  if (IS_PRODUCTION) {
-    // Production / Render – explicit Pool with relaxed-cert SSL
-    const { Pool } = require('pg');
-    const pgPool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false }
-    });
-
-    // quick connectivity probe (non-blocking)
-    pgPool.query('SELECT 1', (err) => {
-      if (err) {
-        logger.error('PostgreSQL connectivity check failed', { error: err.message });
-      } else {
-        logger.info('PostgreSQL connectivity verified');
-      }
-    });
-
-    sessionStore = new PgSession({
-      pool: pgPool,
-      createTableIfMissing: true
-    });
-  } else {
-    // Development – simple connection string, no SSL
-    sessionStore = new PgSession({
-      conString: process.env.DATABASE_URL,
-      createTableIfMissing: true
-    });
-  }
-
-  sessionStore.on('error', (err) => {
-    logger.error('Session store error', { error: err.message });
-  });
-} catch (err) {
-  // Fallback: in-memory store to keep app alive
-  logger.error('PostgreSQL session store init failed – falling back to MemoryStore', {
-    error: err.message,
-    stack: err.stack
-  });
-  const MemoryStore = require('memorystore')(session);
-  sessionStore = new MemoryStore({ checkPeriod: 86_400_000 }); // prune daily
-  logger.warn('USING IN-MEMORY SESSION STORE – sessions lost on restart');
-}
-
-// Ensure secure cookies behind Render’s proxy
-app.set('trust proxy', 1);
-
-const sessionMiddleware = session({
+app.use(session({
   secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: true,
-  store: sessionStore,
+  // MemoryStore is automatically used when no `store` provided
   cookie: {
     secure: IS_PRODUCTION,
     httpOnly: true,
     sameSite: 'lax',
-    domain: process.env.COOKIE_DOMAIN || undefined,
     path: '/',
     maxAge: parseInt(process.env.SESSION_TTL_MS || 86_400_000, 10) // 24 h default
   }
-});
+}));
 
-// Apply middleware with asset-skip + graceful error handling
+// Optional: lightweight debug log when a new session is generated
 app.use((req, res, next) => {
-  if (req.path.match(/\.(css|js|png|jpg|jpeg|gif|svg|ico|woff2?|woff|ttf|eot)$/i)) {
-    return next();
+  if (!req.session.initialised) {
+    logger.info('New session created', { sessionID: req.sessionID });
+    req.session.initialised = true;
   }
-  sessionMiddleware(req, res, (err) => {
-    if (err) {
-      logger.error('Session middleware error – continuing without session', {
-        path: req.path,
-        method: req.method,
-        error: err.message
-      });
-      return next();
-    }
-    next();
-  });
+  next();
 });
 
 // ---------------------------------------------------------------------------
@@ -208,6 +160,14 @@ app.get('/', (req, res) => {
 app.use(express.static(path.join(__dirname, 'public')));
 
 // API routes
+
+// ---------------------------------------------------------------------------
+// Inject optionalAuth ONLY for the auth-debug endpoint so that downstream
+// handler has access to req.user when available, without enforcing auth.
+// Must be registered before the main /api router for correct order.
+// ---------------------------------------------------------------------------
+app.use('/api/auth-debug', optionalAuth);
+
 app.use('/api', apiRoutes);
 
 // QuickBooks OAuth routes
@@ -248,8 +208,11 @@ const htmlRoutes = [
 htmlRoutes.forEach(route => {
   app.get(route.path, (req, res) => {
     // Check if route requires authentication
-    if (route.auth && !req.session.user) {
-      return res.redirect('/login?redirect=' + encodeURIComponent(req.path));
+    if (route.auth) {
+      const hasToken = req.cookies && req.cookies.accessToken;
+      if (!hasToken) {
+        return res.redirect('/login?redirect=' + encodeURIComponent(req.path));
+      }
     }
     
     res.sendFile(path.join(__dirname, 'public', route.file));
