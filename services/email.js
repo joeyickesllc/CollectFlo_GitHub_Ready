@@ -27,7 +27,7 @@ async function sendTestEmail() {
       text: 'If you receive this, your email integration is working!',
       html: '<p>If you receive this, your email integration is working!</p>',
       headers: {
-        'List-Unsubscribe': '<mailto:unsubscribe@collectflow.com>',
+        'List-Unsubscribe': '<mailto:unsubscribe@collectflo.com>',
         'Precedence': 'Bulk'
       },
       categories: ['test-email'],
