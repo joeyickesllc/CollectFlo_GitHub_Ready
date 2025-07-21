@@ -100,25 +100,25 @@ app.use(express.urlencoded({ extended: true }));
 // Session configuration
 // ---------------------------------------------------------------------------
 
-let sessionStore;   // will hold either PgSession or fallback MemoryStore
+let sessionStore; // PgSession or MemoryStore fallback
 
 try {
-  logger.info('Initialising PostgreSQL session store…');
+  logger.info('Initializing PostgreSQL session store…');
 
   if (IS_PRODUCTION) {
-    // In production / Render always enable SSL but relax cert validation
+    // Production / Render – explicit Pool with relaxed-cert SSL
     const { Pool } = require('pg');
     const pgPool = new Pool({
       connectionString: process.env.DATABASE_URL,
       ssl: { rejectUnauthorized: false }
     });
 
-    // Connection test (non-blocking)
+    // quick connectivity probe (non-blocking)
     pgPool.query('SELECT 1', (err) => {
       if (err) {
-        logger.error('PostgreSQL test query failed; sessions may fall back', { error: err });
+        logger.error('PostgreSQL connectivity check failed', { error: err.message });
       } else {
-        logger.info('PostgreSQL connectivity verified for session store');
+        logger.info('PostgreSQL connectivity verified');
       }
     });
 
@@ -127,7 +127,7 @@ try {
       createTableIfMissing: true
     });
   } else {
-    // Development: simple connection string, no SSL
+    // Development – simple connection string, no SSL
     sessionStore = new PgSession({
       conString: process.env.DATABASE_URL,
       createTableIfMissing: true
@@ -135,51 +135,50 @@ try {
   }
 
   sessionStore.on('error', (err) => {
-    logger.error('Session store error (PostgreSQL)', { error: err });
+    logger.error('Session store error', { error: err.message });
   });
 } catch (err) {
-  // Catastrophic failure -> fall back to in-memory
-  logger.error('Failed to initialise PostgreSQL session store – falling back to MemoryStore', {
+  // Fallback: in-memory store to keep app alive
+  logger.error('PostgreSQL session store init failed – falling back to MemoryStore', {
     error: err.message,
     stack: err.stack
   });
   const MemoryStore = require('memorystore')(session);
-  sessionStore = new MemoryStore({ checkPeriod: 8.64e7 }); // prune daily
+  sessionStore = new MemoryStore({ checkPeriod: 86_400_000 }); // prune daily
   logger.warn('USING IN-MEMORY SESSION STORE – sessions lost on restart');
 }
 
-// Always trust proxy so secure cookies & IP work correctly on Render
+// Ensure secure cookies behind Render’s proxy
 app.set('trust proxy', 1);
 
-// Wrap session middleware to (a) skip static assets, (b) trap errors
-const baseSessionMiddleware = session({
+const sessionMiddleware = session({
   secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: true,
   store: sessionStore,
   cookie: {
-    secure  : IS_PRODUCTION,
+    secure: IS_PRODUCTION,
     httpOnly: true,
     sameSite: 'lax',
-    domain  : process.env.COOKIE_DOMAIN || undefined,
-    path    : '/',
-    maxAge  : parseInt(process.env.SESSION_TTL_MS || 86_400_000, 10) // 24h default
+    domain: process.env.COOKIE_DOMAIN || undefined,
+    path: '/',
+    maxAge: parseInt(process.env.SESSION_TTL_MS || 86_400_000, 10) // 24 h default
   }
 });
 
+// Apply middleware with asset-skip + graceful error handling
 app.use((req, res, next) => {
-  // Skip heavy session work for obvious static assets
-  if (req.path.match(/\.(css|js|png|jpg|jpeg|gif|svg|ico|woff2?|ttf|eot)$/i)) {
+  if (req.path.match(/\.(css|js|png|jpg|jpeg|gif|svg|ico|woff2?|woff|ttf|eot)$/i)) {
     return next();
   }
-  baseSessionMiddleware(req, res, (err) => {
+  sessionMiddleware(req, res, (err) => {
     if (err) {
-      logger.error('Session middleware failed to process request', {
+      logger.error('Session middleware error – continuing without session', {
         path: req.path,
         method: req.method,
         error: err.message
       });
-      return next(); // continue without a session rather than crashing
+      return next();
     }
     next();
   });
