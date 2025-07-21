@@ -69,12 +69,20 @@ exports.login = async (req, res) => {
     const refreshToken = jwtService.generateRefreshToken(user);
     setAuthCookies(res, accessToken, refreshToken);
 
+    // Create session for backwards compatibility with session-based code
+    req.session.user = {
+      id        : user.id,
+      email     : user.email,
+      name      : user.name,
+      company_id: user.company_id,
+      role      : user.role
+    };
+
     logger.info('User logged in', { userId: user.id, email: user.email });
 
     return res.status(200).json({
       success: true,
       message: 'Login successful',
-      redirect,
       user: {
         id   : user.id,
         email: user.email,
@@ -173,6 +181,15 @@ exports.signup = async (req, res) => {
     const accessToken  = jwtService.generateAccessToken(result.user);
     const refreshToken = jwtService.generateRefreshToken(result.user);
     setAuthCookies(res, accessToken, refreshToken);
+
+    // Create session for backwards compatibility with session-based code
+    req.session.user = {
+      id        : result.user.id,
+      email     : result.user.email,
+      name      : result.user.name,
+      company_id: result.companyId,
+      role      : result.user.role
+    };
 
     logger.info('New user signed up', { userId: result.user.id, email: email });
 

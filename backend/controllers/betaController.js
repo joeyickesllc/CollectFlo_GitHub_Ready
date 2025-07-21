@@ -96,8 +96,18 @@ exports.signup = async (req, res) => {
     const refreshToken = jwtService.generateRefreshToken(result.user);
     setAuthCookies(res, accessToken, refreshToken);
 
+    // Create session for backwards compatibility with session-based code
+    req.session.user = {
+      id        : result.user.id,
+      email     : result.user.email,
+      name      : result.user.name,
+      company_id: result.companyId,
+      role      : result.user.role,
+      is_beta   : true
+    };
+
     // Log beta signup
-    logger.info(`New beta user signed up: ${email} for company: ${company_name}`, { 
+    logger.info(`New beta user signed up: ${email} for company: ${company_name}`, {
       userId: result.user.id,
       isBeta: true
     });
@@ -106,7 +116,6 @@ exports.signup = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: 'Beta signup successful',
-      redirect: '/beta-onboarding',
       user: {
         id: result.user.id,
         email: result.user.email,
