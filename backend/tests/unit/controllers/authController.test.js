@@ -12,6 +12,18 @@
 const bcrypt = require('bcryptjs');
 const { login } = require('../../../controllers/authController');
 
+jest.mock('../../../middleware/jwtAuthMiddleware', () => ({
+  setAuthCookies: jest.fn(),
+  clearAuthCookies: jest.fn(),
+}));
+jest.mock('../../../services/jwtService', () => ({
+  generateAccessToken: jest.fn(() => 'access-token'),
+  generateRefreshToken: jest.fn(() => 'refresh-token'),
+}));
+
+const { setAuthCookies } = require('../../../middleware/jwtAuthMiddleware');
+const jwtService = require('../../../services/jwtService');
+
 // Mock dependencies
 jest.mock('bcryptjs');
 jest.mock('../../../db/connection', () => ({
@@ -85,17 +97,14 @@ describe('Auth Controller - Login', () => {
       ['test@example.com']
     );
     expect(bcrypt.compare).toHaveBeenCalledWith('correctPassword', 'hashedPassword');
-    expect(req.session.user).toEqual({
-      id: 1,
-      email: 'test@example.com',
-      name: 'Test User',
-      company_id: 1,
-      role: 'admin'
-    });
+    expect(jwtService.generateAccessToken).toHaveBeenCalledWith(mockUser);
+    expect(jwtService.generateRefreshToken).toHaveBeenCalledWith(mockUser);
+    expect(setAuthCookies).toHaveBeenCalledWith(res, 'access-token', 'refresh-token');
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({
       success: true,
       message: 'Login successful',
+      redirect: '/dashboard',
       user: {
         id: 1,
         email: 'test@example.com',
