@@ -103,7 +103,14 @@ app.use(express.urlencoded({ extended: true }));
 // so the connection works against a local DB without TLS.
 const pgSessionStore = new PgSession({
   conString: process.env.DATABASE_URL,
-  ssl: (IS_PRODUCTION || IS_RENDER) ? true : false   // `true` lets pg enable TLS
+  // IMPORTANT:
+  // • Cloud providers (Render, Heroku, etc.) supply self-signed certs.
+  // • pg treats `ssl: true` as “validate certificates”.
+  // • `{ rejectUnauthorized: false }` enables TLS while skipping CA validation,
+  //   which is required for these managed databases.
+  ssl: (IS_PRODUCTION || IS_RENDER)
+    ? { rejectUnauthorized: false }   // enable SSL, skip CA validation
+    : false                           // disable SSL locally
 });
 
 // Log/store errors explicitly so they never crash the app silently
