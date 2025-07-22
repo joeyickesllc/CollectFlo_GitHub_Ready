@@ -45,7 +45,9 @@ async function loadNav() {
       '/help',
       '/privacy',
       '/login',
-      '/signup'
+      '/signup',
+      '/beta-signup',
+      '/beta-stats'
     ];
 
     if (publicPages.includes(currentPath)) {
@@ -180,7 +182,9 @@ function shouldLoadNav() {
     '/help',
     '/privacy',
     '/login',
-    '/signup'
+    '/signup',
+    '/beta-signup',
+    '/beta-stats'
   ];
 
   if (publicPages.includes(currentPath)) {
