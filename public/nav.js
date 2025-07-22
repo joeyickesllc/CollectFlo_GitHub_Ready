@@ -34,7 +34,21 @@ async function fetchWithRetry(url, options = {}, maxAttempts = 3, backoffMs = 25
 async function loadNav() {
   try {
     const currentPath = window.location.pathname;
-    const publicPages = ['/', '/landing', '/beta', '/help', '/privacy'];
+    // Pages that do NOT require nav + auth check.
+    // Added '/login' and '/signup' to prevent unnecessary auth calls
+    // that caused a redirect loop when the user is explicitly on
+    // the authentication pages.
+    const publicPages = [
+      '/',
+      '/landing',
+      '/beta',
+      '/help',
+      '/privacy',
+      '/login',
+      '/signup',
+      '/beta-signup',
+      '/beta-stats'
+    ];
 
     if (publicPages.includes(currentPath)) {
       console.log('Public page detected inside loadNav() — skipping auth check and nav injection.');
@@ -161,7 +175,17 @@ async function logout() {
 // Should nav even load on this page?
 function shouldLoadNav() {
   const currentPath = window.location.pathname;
-  const publicPages = ['/', '/landing', '/beta', '/help', '/privacy'];
+  const publicPages = [
+    '/',
+    '/landing',
+    '/beta',
+    '/help',
+    '/privacy',
+    '/login',
+    '/signup',
+    '/beta-signup',
+    '/beta-stats'
+  ];
 
   if (publicPages.includes(currentPath)) {
     console.log('Skipping nav.js on public page:', currentPath);
