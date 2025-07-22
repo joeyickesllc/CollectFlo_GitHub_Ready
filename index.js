@@ -15,6 +15,7 @@ const multer = require('multer');
 const { applySecurityMiddleware } = require('./backend/middleware/securityMiddleware');
 const cookieParser = require('cookie-parser');   // <-- added
 const { optionalAuth } = require('./backend/middleware/jwtAuthMiddleware'); // new import
+const jwtService   = require('./backend/services/jwtService'); // JWT verification
 
 // Application modules
 const db = require('./backend/db/connection');
@@ -119,9 +120,7 @@ app.use(session({
   saveUninitialized: true,
   // MemoryStore is automatically used when no `store` provided
   cookie: {
-    // Use per-request HTTPS detection so sessions also work over HTTP in
-    // local development while remaining secure in production behind TLS.
-    secure: 'auto',
+    secure: IS_PRODUCTION,
     httpOnly: true,
     sameSite: 'lax',
     path: '/',
@@ -211,8 +210,20 @@ htmlRoutes.forEach(route => {
   app.get(route.path, (req, res) => {
     // Check if route requires authentication
     if (route.auth) {
-      const hasToken = req.cookies && req.cookies.accessToken;
-      if (!hasToken) {
+      const token = req.cookies && req.cookies.accessToken;
+
+      // No token at all → redirect to login
+      if (!token) {
+        return res.redirect('/login?redirect=' + encodeURIComponent(req.path));
+      }
+
+      // Verify token; clear cookies & redirect on failure
+      try {
+        jwtService.verifyToken(token, 'access');
+      } catch (err) {
+        // Invalid / expired token – clean up and force re-login
+        res.clearCookie('accessToken', { path: '/' });
+        res.clearCookie('refreshToken', { path: '/' });
         return res.redirect('/login?redirect=' + encodeURIComponent(req.path));
       }
     }

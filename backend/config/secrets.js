@@ -92,7 +92,38 @@ const secrets = {
                         getSecret('CORS_ALLOWED_ORIGINS').split(',').map(s => s.trim()) : 
                         ['http://localhost:3000', 'http://localhost:5173'],
   },
+
+  // -----------------------------------------------------------------
+  // JWT Authentication
+  // -----------------------------------------------------------------
+  // NOTE:
+  //   • In production these **must** be set to strong, random strings.
+  //   • The defaults below are safe ONLY for local development/testing.
+  //
+  jwt: {
+    accessSecret       : getSecret('JWT_ACCESS_SECRET',  false) || 'collectflo-access-dev-secret',
+    refreshSecret      : getSecret('JWT_REFRESH_SECRET', false) || 'collectflo-refresh-dev-secret',
+    issuer             : getSecret('JWT_ISSUER',         false) || 'collectflo-api',
+    accessTokenExpiry  : getSecret('ACCESS_TOKEN_EXPIRY',  false) || '30m',
+    refreshTokenExpiry : getSecret('REFRESH_TOKEN_EXPIRY', false) || '7d',
+  },
 };
 
 // Export the centralized secrets object
 module.exports = secrets;
+
+// ---------------------------------------------------------------------------
+// Warn when insecure defaults are used in production
+// ---------------------------------------------------------------------------
+if (NODE_ENV === 'production') {
+  const { accessSecret, refreshSecret } = secrets.jwt;
+  if (accessSecret === 'collectflo-access-dev-secret' ||
+      refreshSecret === 'collectflo-refresh-dev-secret') {
+    /* eslint-disable no-console */
+    console.warn(
+      '[SECURITY] JWT secrets are using development defaults in PRODUCTION!\\n' +
+      '          Set JWT_ACCESS_SECRET and JWT_REFRESH_SECRET to strong, random strings.'
+    );
+    /* eslint-enable no-console */
+  }
+}
