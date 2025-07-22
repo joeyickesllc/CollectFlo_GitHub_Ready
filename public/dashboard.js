@@ -1,4 +1,16 @@
 // Check authentication status on page load
+// ------------------------------------------------------------------
+// Centralised login redirect helper
+// Ensures we attempt to redirect only once even if multiple auth checks
+// fail at roughly the same time.
+// ------------------------------------------------------------------
+let hasRedirected = false;
+function redirectToLogin(delay = 100) {
+  if (hasRedirected) return;
+  hasRedirected = true;
+  setTimeout(() => (window.location.href = '/login'), delay);
+}
+
 async function checkAuthentication() {
   try {
     console.log('Checking authentication...');
@@ -14,10 +26,7 @@ async function checkAuthentication() {
 
     if (!response.ok) {
       console.log('User not authenticated, status:', response.status);
-      // Add a small delay to prevent rapid redirects
-      setTimeout(() => {
-        window.location.href = '/login';
-      }, 100);
+      redirectToLogin();
       return false;
     }
 
@@ -26,10 +35,7 @@ async function checkAuthentication() {
     return true;
   } catch (error) {
     console.error('Authentication check failed:', error);
-    // Add a small delay to prevent rapid redirects
-    setTimeout(() => {
-      window.location.href = '/login';
-    }, 100);
+    redirectToLogin();
     return false;
   }
 }
@@ -44,7 +50,7 @@ async function updateStats() {
 
     if (!statsResponse.ok || !analyticsResponse.ok) {
       console.log('API requests failed, redirecting to login');
-      window.location.href = '/login';
+      redirectToLogin();
       return;
     }
 
@@ -65,7 +71,7 @@ async function updateStats() {
       `${stats.openRate?.rate || '0'}%`;
   } catch (error) {
     console.error('Error updating stats:', error);
-    window.location.href = '/login';
+    redirectToLogin();
   }
 }
 
@@ -76,7 +82,7 @@ async function updateInvoices() {
 
     if (!response.ok) {
       console.log('Invoice API failed, redirecting to login');
-      window.location.href = '/login';
+      redirectToLogin();
       return;
     }
 
@@ -103,7 +109,7 @@ async function updateInvoices() {
     `).join('');
   } catch (error) {
     console.error('Error updating invoices:', error);
-    window.location.href = '/login';
+    redirectToLogin();
   }
 }
 
@@ -124,7 +130,7 @@ async function toggleInvoiceExclusion(invoiceId, isIncluded) {
 
     if (!response.ok) {
       if (response.status === 401) {
-        window.location.href = '/login';
+        redirectToLogin();
         return;
       }
       throw new Error('Failed to update exclusion status');
@@ -158,6 +164,9 @@ async function initializeDashboard() {
 // Start initialization when page loads
 document.addEventListener('DOMContentLoaded', initializeDashboard);
 
+// ------------------------------------------------------------------
+// Duplicate auth-check block ­– keep but use central redirect helper
+// ------------------------------------------------------------------
 // Check authentication on page load
 fetch('/api/user-info', {
   credentials: 'include', // Include cookies
@@ -169,7 +178,7 @@ fetch('/api/user-info', {
     console.log('Dashboard auth check response:', response.status);
     if (!response.ok) {
       console.log('Not authenticated, redirecting to login');
-      window.location.href = '/login';
+      redirectToLogin();
       return;
     }
     return response.json();
@@ -184,7 +193,7 @@ fetch('/api/user-info', {
   })
   .catch(error => {
     console.error('Authentication error:', error);
-    window.location.href = '/login';
+    redirectToLogin();
   });
 
 // Load dashboard statistics
