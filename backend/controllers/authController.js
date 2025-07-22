@@ -285,9 +285,19 @@ exports.checkAuth = (req, res) => {
  * @param {Object} res - Express response object
  */
 exports.changePassword = async (req, res) => {
+  let userId;
+  let userEmail;
+
   try {
     const { currentPassword, newPassword } = req.body;
-    const userId = req.session.user.id;
+
+    // Prefer JWT auth data but fall back to session for backwards compatibility
+    userId = req.user?.id || req.session?.user?.id;
+    userEmail = req.user?.email || req.session?.user?.email;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
 
     // Validate input
     if (!currentPassword || !newPassword) {
@@ -326,14 +336,14 @@ exports.changePassword = async (req, res) => {
       [hashedPassword, userId]
     );
 
-    logger.info(`User changed password: ${req.session.user.email}`, { userId });
+    logger.info(`User changed password: ${userEmail}`, { userId });
 
     return res.status(200).json({
       success: true,
       message: 'Password changed successfully'
     });
   } catch (error) {
-    logger.error('Change password error:', { error, userId: req.session?.user?.id });
+    logger.error('Change password error:', { error, userId });
     return res.status(500).json({
       success: false,
       message: 'An error occurred while changing password'
