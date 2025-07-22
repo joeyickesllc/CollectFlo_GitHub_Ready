@@ -10,13 +10,19 @@ const router = express.Router();
 const authController = require('../controllers/authController');
 const jwtAuthMiddleware = require('../middleware/jwtAuthMiddleware');
 const logger = require('../services/logger');
+const {
+  authRateLimiter,
+  signupRateLimiter,
+  validateLogin,
+  validateSignup
+} = require('../middleware/securityMiddleware');
 
 /**
  * @route   POST /api/auth/login
  * @desc    Authenticate user & get tokens
  * @access  Public
  */
-router.post('/login', async (req, res) => {
+router.post('/login', authRateLimiter, validateLogin, async (req, res) => {
   try {
     await authController.login(req, res);
   } catch (error) {
@@ -33,7 +39,7 @@ router.post('/login', async (req, res) => {
  * @desc    Register a new user
  * @access  Public
  */
-router.post('/signup', async (req, res) => {
+router.post('/signup', signupRateLimiter, validateSignup, async (req, res) => {
   try {
     await authController.signup(req, res);
   } catch (error) {
