@@ -119,7 +119,9 @@ app.use(session({
   saveUninitialized: true,
   // MemoryStore is automatically used when no `store` provided
   cookie: {
-    secure: IS_PRODUCTION,
+    // Use per-request HTTPS detection so sessions also work over HTTP in
+    // local development while remaining secure in production behind TLS.
+    secure: 'auto',
     httpOnly: true,
     sameSite: 'lax',
     path: '/',
