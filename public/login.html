@@ -28,7 +28,7 @@
         </div>
       </div>
       
-      <form onsubmit="handleLogin(event)" class="space-y-6 bg-white p-8 rounded-lg shadow">
+      <form id="login-form" class="space-y-6 bg-white p-8 rounded-lg shadow">
         <div>
           <label class="block text-sm font-medium mb-1">Email Address</label>
           <input type="email" id="email" required class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
@@ -89,9 +89,13 @@
     }
     
     // Set redirect URL when page loads
-    document.addEventListener('DOMContentLoaded', function() {
-      redirectUrl = getRedirectUrl();
-    });
+   document.addEventListener('DOMContentLoaded', function() {
+  redirectUrl = getRedirectUrl();
+  
+  // Add form event listener (CSP-compliant)
+  const loginForm = document.getElementById('login-form');
+  loginForm.addEventListener('submit', handleLogin);
+});
     
     function showError(title, message) {
       const container = document.getElementById('error-container');
