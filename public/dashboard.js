@@ -48,12 +48,8 @@ async function updateStats() {
       fetch('/api/dashboard/analytics', { credentials: 'include' })
     ]);
 
-    // Redirect ONLY for authentication failures (401/403), ignore 404/501
-    if (
-      statsResponse.status === 401 || statsResponse.status === 403 ||
-      analyticsResponse.status === 401 || analyticsResponse.status === 403
-    ) {
-      console.log('Stats/analytics auth error, redirecting to login');
+    if (!statsResponse.ok || !analyticsResponse.ok) {
+      console.log('API requests failed, redirecting to login');
       redirectToLogin();
       return;
     }
@@ -63,7 +59,7 @@ async function updateStats() {
 
     // Update payment analytics
     document.getElementById('avgDaysToPayment').textContent = 
-      `${(analytics.avgDaysToPayment?.toFixed(1) || '0.0')} days`;
+      `${analytics.avgDaysToPayment.toFixed(1)} days`;
     document.getElementById('paymentTrend').textContent = 
       `${analytics.paymentTrendPercentage}%`;
 
@@ -75,7 +71,7 @@ async function updateStats() {
       `${stats.openRate?.rate || '0'}%`;
   } catch (error) {
     console.error('Error updating stats:', error);
-    // Log the error but do not force logout for missing/invalid data
+    redirectToLogin();
   }
 }
 
@@ -84,9 +80,8 @@ async function updateInvoices() {
   try {
     const response = await fetch('/api/invoices', { credentials: 'include' });
 
-    // Redirect only when authentication fails
-    if (response.status === 401 || response.status === 403) {
-      console.log('Invoice API auth error, redirecting to login');
+    if (!response.ok) {
+      console.log('Invoice API failed, redirecting to login');
       redirectToLogin();
       return;
     }
@@ -191,8 +186,18 @@ fetch('/api/user-info', {
   .then(userInfo => {
     if (userInfo) {
       console.log('User authenticated on dashboard:', userInfo.email);
-      document.getElementById('user-name').textContent = userInfo.full_name || userInfo.email;
-      document.getElementById('company-name').textContent = userInfo.company_name || 'Your Company';
+      // Safely update header/name elements – only if they exist in the DOM
+      const userNameEl    = document.getElementById('user-name');
+      const companyNameEl = document.getElementById('company-name');
+
+      if (userNameEl) {
+        userNameEl.textContent = userInfo.full_name || userInfo.email;
+      }
+
+      if (companyNameEl) {
+        companyNameEl.textContent = userInfo.company_name || 'Your Company';
+      }
+
       loadDashboardData();
     }
   })
