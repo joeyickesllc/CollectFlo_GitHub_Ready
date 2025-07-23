@@ -191,8 +191,15 @@ fetch('/api/user-info', {
   .then(userInfo => {
     if (userInfo) {
       console.log('User authenticated on dashboard:', userInfo.email);
-      document.getElementById('user-name').textContent = userInfo.full_name || userInfo.email;
-      document.getElementById('company-name').textContent = userInfo.company_name || 'Your Company';
+  const userNameEl = document.getElementById('user-name');
+if (userNameEl) {
+  userNameEl.textContent = userInfo.full_name || userInfo.email;
+}
+
+const companyNameEl = document.getElementById('company-name');
+if (companyNameEl) {
+  companyNameEl.textContent = userInfo.company_name || 'Your Company';
+}
       loadDashboardData();
     }
   })
