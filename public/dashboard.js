@@ -43,19 +43,24 @@ async function checkAuthentication() {
 // Fetch dashboard stats
 async function updateStats() {
   try {
+    // helper inside function scope (kept small & local)
+    const isAuthError = (resp) => resp.status === 401 || resp.status === 403;
+
     const [statsResponse, analyticsResponse] = await Promise.all([
       fetch('/api/dashboard/stats', { credentials: 'include' }),
       fetch('/api/dashboard/analytics', { credentials: 'include' })
     ]);
 
-    if (!statsResponse.ok || !analyticsResponse.ok) {
-      console.log('API requests failed, redirecting to login');
+    // Redirect ONLY when auth failure
+    if (isAuthError(statsResponse) || isAuthError(analyticsResponse)) {
+      console.log('Stats/analytics auth error, redirecting to login');
       redirectToLogin();
       return;
     }
 
-    const stats = await statsResponse.json();
-    const analytics = await analyticsResponse.json();
+    // Gracefully handle missing/501 endpoints with defaults
+    const stats      = statsResponse.ok      ? await statsResponse.json()      : {};
+    const analytics  = analyticsResponse.ok  ? await analyticsResponse.json()  : {};
 
     // Update payment analytics
     document.getElementById('avgDaysToPayment').textContent = 
@@ -80,13 +85,14 @@ async function updateInvoices() {
   try {
     const response = await fetch('/api/invoices', { credentials: 'include' });
 
-    if (!response.ok) {
-      console.log('Invoice API failed, redirecting to login');
+    if (response.status === 401 || response.status === 403) {
+      console.log('Invoice API auth error, redirecting to login');
       redirectToLogin();
       return;
     }
 
-    const invoices = await response.json();
+    // On 404/501 just treat as empty list
+    const invoices = response.ok ? await response.json() : [];
 
     const tbody = document.getElementById('invoiceTableBody');
     tbody.innerHTML = invoices.map(invoice => `
