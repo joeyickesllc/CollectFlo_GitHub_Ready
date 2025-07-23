@@ -24,30 +24,17 @@ async function checkAuthentication() {
 
     console.log('Auth response status:', response.status);
 
-    // Only redirect for actual auth failures, not missing endpoints
-    if (response.status === 401 || response.status === 403) {
+    if (!response.ok) {
       console.log('User not authenticated, status:', response.status);
       redirectToLogin();
       return false;
     }
 
-    // Try to parse user info if available
-    let user = {};
-    if (response.ok) {
-      try {
-        user = await response.json();
-        console.log('User authenticated:', user.email);
-      } catch (e) {
-        console.warn('Could not parse user info:', e);
-      }
-    } else {
-      console.warn('User info endpoint returned non-OK status:', response.status);
-    }
-    
+    const user = await response.json();
+    console.log('User authenticated:', user.email);
     return true;
   } catch (error) {
     console.error('Authentication check failed:', error);
-    // Only redirect for network errors, not for parsing errors
     redirectToLogin();
     return false;
   }
@@ -56,68 +43,39 @@ async function checkAuthentication() {
 // Fetch dashboard stats
 async function updateStats() {
   try {
-    // Helper function to check for auth errors
-    const isAuthError = (response) => response.status === 401 || response.status === 403;
-    
     const [statsResponse, analyticsResponse] = await Promise.all([
       fetch('/api/dashboard/stats', { credentials: 'include' }),
       fetch('/api/dashboard/analytics', { credentials: 'include' })
     ]);
 
-    // Only redirect for auth errors (401/403), not for missing endpoints (404/501)
-    if (isAuthError(statsResponse) || isAuthError(analyticsResponse)) {
+    // Redirect ONLY for authentication failures (401/403), ignore 404/501
+    if (
+      statsResponse.status === 401 || statsResponse.status === 403 ||
+      analyticsResponse.status === 401 || analyticsResponse.status === 403
+    ) {
       console.log('Stats/analytics auth error, redirecting to login');
       redirectToLogin();
       return;
     }
 
-    // Use default empty objects for missing endpoints
-    let stats = {};
-    let analytics = {};
-    
-    // Try to parse responses if they're OK
-    if (statsResponse.ok) {
-      try { stats = await statsResponse.json(); } 
-      catch (e) { console.warn('Could not parse stats:', e); }
-    }
-    
-    if (analyticsResponse.ok) {
-      try { analytics = await analyticsResponse.json(); } 
-      catch (e) { console.warn('Could not parse analytics:', e); }
-    }
+    const stats = await statsResponse.json();
+    const analytics = await analyticsResponse.json();
 
-    // Update payment analytics with fallbacks for missing data
-    const avgDaysEl = document.getElementById('avgDaysToPayment');
-    if (avgDaysEl) {
-      avgDaysEl.textContent = analytics.avgDaysToPayment 
-        ? `${analytics.avgDaysToPayment.toFixed(1)} days` 
-        : 'N/A';
-    }
-    
-    const trendEl = document.getElementById('paymentTrend');
-    if (trendEl) {
-      trendEl.textContent = analytics.paymentTrendPercentage 
-        ? `${analytics.paymentTrendPercentage}%` 
-        : 'N/A';
-    }
+    // Update payment analytics
+    document.getElementById('avgDaysToPayment').textContent = 
+      `${(analytics.avgDaysToPayment?.toFixed(1) || '0.0')} days`;
+    document.getElementById('paymentTrend').textContent = 
+      `${analytics.paymentTrendPercentage}%`;
 
-    const outstandingEl = document.getElementById('totalOutstanding');
-    if (outstandingEl) {
-      outstandingEl.textContent = `$${stats.totalOutstanding?.total?.toFixed(2) || '0.00'}`;
-    }
-    
-    const followupsEl = document.getElementById('followupsToday');
-    if (followupsEl) {
-      followupsEl.textContent = stats.followupsToday?.count || '0';
-    }
-    
-    const rateEl = document.getElementById('openRate');
-    if (rateEl) {
-      rateEl.textContent = `${stats.openRate?.rate || '0'}%`;
-    }
+    document.getElementById('totalOutstanding').textContent = 
+      `$${stats.totalOutstanding?.total?.toFixed(2) || '0.00'}`;
+    document.getElementById('followupsToday').textContent = 
+      stats.followupsToday?.count || '0';
+    document.getElementById('openRate').textContent = 
+      `${stats.openRate?.rate || '0'}%`;
   } catch (error) {
     console.error('Error updating stats:', error);
-    // Don't redirect for data errors
+    // Log the error but do not force logout for missing/invalid data
   }
 }
 
@@ -126,40 +84,16 @@ async function updateInvoices() {
   try {
     const response = await fetch('/api/invoices', { credentials: 'include' });
 
-    // Only redirect for auth errors (401/403), not for missing endpoints (404/501)
+    // Redirect only when authentication fails
     if (response.status === 401 || response.status === 403) {
       console.log('Invoice API auth error, redirecting to login');
       redirectToLogin();
       return;
     }
 
-    // Use empty array for missing/error endpoints
-    let invoices = [];
-    if (response.ok) {
-      try {
-        invoices = await response.json();
-      } catch (e) {
-        console.warn('Could not parse invoices:', e);
-      }
-    }
+    const invoices = await response.json();
 
     const tbody = document.getElementById('invoiceTableBody');
-    if (!tbody) {
-      console.warn('Invoice table body element not found');
-      return;
-    }
-    
-    if (invoices.length === 0) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="7" class="px-6 py-4 text-center text-gray-500">
-            No invoices found or API not implemented yet.
-          </td>
-        </tr>
-      `;
-      return;
-    }
-
     tbody.innerHTML = invoices.map(invoice => `
       <tr>
         <td class="px-6 py-4">
@@ -180,7 +114,7 @@ async function updateInvoices() {
     `).join('');
   } catch (error) {
     console.error('Error updating invoices:', error);
-    // Don't redirect for data errors
+    redirectToLogin();
   }
 }
 
@@ -199,9 +133,12 @@ async function toggleInvoiceExclusion(invoiceId, isIncluded) {
       })
     });
 
-    if (response.status === 401 || response.status === 403) {
-      redirectToLogin();
-      return;
+    if (!response.ok) {
+      if (response.status === 401) {
+        redirectToLogin();
+        return;
+      }
+      throw new Error('Failed to update exclusion status');
     }
 
     // Refresh the dashboard stats since excluded invoices affect calculations
@@ -244,42 +181,19 @@ fetch('/api/user-info', {
 })
   .then(response => {
     console.log('Dashboard auth check response:', response.status);
-    // Only redirect for auth errors (401/403), not for missing endpoints
-    if (response.status === 401 || response.status === 403) {
+    if (!response.ok) {
       console.log('Not authenticated, redirecting to login');
       redirectToLogin();
-      return null;
+      return;
     }
-    
-    // Try to parse response if it's OK
-    if (response.ok) {
-      return response.json().catch(err => {
-        console.warn('Failed to parse user info:', err);
-        return null;
-      });
-    }
-    
-    console.warn('User info endpoint returned non-OK status:', response.status);
-    return null;
+    return response.json();
   })
   .then(userInfo => {
     if (userInfo) {
       console.log('User authenticated on dashboard:', userInfo.email);
-      
-      // Safely update user info elements if they exist
-      const userNameEl = document.getElementById('user-name');
-      if (userNameEl) {
-        userNameEl.textContent = userInfo.full_name || userInfo.email;
-      }
-      
-      const companyNameEl = document.getElementById('company-name');
-      if (companyNameEl) {
-        companyNameEl.textContent = userInfo.company_name || 'Your Company';
-      }
-      
-      if (typeof loadDashboardData === 'function') {
-        loadDashboardData();
-      }
+      document.getElementById('user-name').textContent = userInfo.full_name || userInfo.email;
+      document.getElementById('company-name').textContent = userInfo.company_name || 'Your Company';
+      loadDashboardData();
     }
   })
   .catch(error => {
@@ -295,45 +209,25 @@ async function loadDashboardStats() {
       credentials: 'include'
     });
 
-    // Only redirect for auth errors, handle missing endpoints gracefully
-    if (response.status === 401 || response.status === 403) {
-      redirectToLogin();
-      return;
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    let stats = {};
-    if (response.ok) {
-      try {
-        stats = await response.json();
-      } catch (e) {
-        console.warn('Could not parse stats:', e);
-      }
-    }
+    const stats = await response.json();
 
-    // Update stats display with fallbacks
-    const outstandingEl = document.getElementById('total-outstanding');
-    if (outstandingEl) {
-      outstandingEl.textContent = `$${(stats.totalOutstanding?.total || 0).toLocaleString()}`;
-    }
-    
-    const followupsEl = document.getElementById('followups-today');
-    if (followupsEl) {
-      followupsEl.textContent = stats.followupsToday?.count || 0;
-    }
-    
-    const rateEl = document.getElementById('open-rate');
-    if (rateEl) {
-      rateEl.textContent = `${stats.openRate?.rate || 0}%`;
-    }
+    // Update stats display
+    document.getElementById('total-outstanding').textContent = 
+      `$${(stats.totalOutstanding?.total || 0).toLocaleString()}`;
+    document.getElementById('followups-today').textContent = 
+      stats.followupsToday?.count || 0;
+    document.getElementById('open-rate').textContent = 
+      `${stats.openRate?.rate || 0}%`;
 
   } catch (error) {
     console.error('Error loading dashboard stats:', error);
-    // Display error messages but don't redirect
-    const elements = ['total-outstanding', 'followups-today', 'open-rate'];
-    elements.forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = 'Error';
-    });
+    document.getElementById('total-outstanding').textContent = 'Error';
+    document.getElementById('followups-today').textContent = 'Error';
+    document.getElementById('open-rate').textContent = 'Error';
   }
 }
 
@@ -345,26 +239,12 @@ async function loadInvoices() {
       credentials: 'include'
     });
 
-    // Only redirect for auth errors, handle missing endpoints gracefully
-    if (response.status === 401 || response.status === 403) {
-      redirectToLogin();
-      return;
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    let invoices = [];
-    if (response.ok) {
-      try {
-        invoices = await response.json();
-      } catch (e) {
-        console.warn('Could not parse invoices:', e);
-      }
-    }
-    
+    const invoices = await response.json();
     const tableBody = document.getElementById('invoices-table-body');
-    if (!tableBody) {
-      console.warn('Invoices table body element not found');
-      return;
-    }
 
     if (invoices.length === 0) {
       tableBody.innerHTML = `
@@ -402,16 +282,13 @@ async function loadInvoices() {
 
   } catch (error) {
     console.error('Error loading invoices:', error);
-    const tableBody = document.getElementById('invoices-table-body');
-    if (tableBody) {
-      tableBody.innerHTML = `
-        <tr>
-          <td colspan="6" class="px-6 py-4 text-center text-red-500">
-            Error loading invoices. Please refresh the page.
-          </td>
-        </tr>
-      `;
-    }
+    document.getElementById('invoices-table-body').innerHTML = `
+      <tr>
+        <td colspan="6" class="px-6 py-4 text-center text-red-500">
+          Error loading invoices. Please refresh the page.
+        </td>
+      </tr>
+    `;
   }
 }
 
@@ -430,10 +307,8 @@ async function toggleExclusion(invoiceId, excluded) {
       })
     });
 
-    // Only redirect for auth errors
-    if (response.status === 401 || response.status === 403) {
-      redirectToLogin();
-      return;
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     // Reload invoices to reflect changes
@@ -450,26 +325,17 @@ async function loadDashboard() {
     try {
         // Check authentication first
         const userResponse = await fetch('/api/user-info');
-        
-        // Only redirect for actual auth errors
-        if (userResponse.status === 401 || userResponse.status === 403) {
+        if (!userResponse.ok) {
             console.log('User not authenticated, status:', userResponse.status);
             window.location.href = '/login';
             return;
         }
 
-        let user = {};
-        if (userResponse.ok) {
-            try {
-                user = await userResponse.json();
-                console.log('User authenticated:', user.email);
-            } catch (e) {
-                console.warn('Could not parse user info:', e);
-            }
-        }
+        const user = await userResponse.json();
+        console.log('User authenticated:', user.email);
 
         // Update user info in nav if available
-        if (typeof updateUserInfo === 'function' && user) {
+        if (typeof updateUserInfo === 'function') {
             updateUserInfo(user);
         }
 
@@ -488,36 +354,16 @@ async function loadDashboard() {
 async function loadStats() {
     try {
         const response = await fetch('/api/dashboard/stats');
-        
-        // Don't redirect for missing endpoints
-        let stats = { total: 0, pending: 0, delivered: 0, outstanding: 0 };
-        
         if (response.ok) {
-            try {
-                stats = await response.json();
-            } catch (e) {
-                console.warn('Could not parse stats:', e);
-            }
-        } else if (response.status === 401 || response.status === 403) {
-            window.location.href = '/login';
-            return;
-        }
+            const stats = await response.json();
 
-        // Update stats with fallbacks
-        const totalEl = document.getElementById('total-followups');
-        if (totalEl) totalEl.textContent = stats.total || 0;
-        
-        const pendingEl = document.getElementById('pending-followups');
-        if (pendingEl) pendingEl.textContent = stats.pending || 0;
-        
-        const deliveredEl = document.getElementById('delivered-followups');
-        if (deliveredEl) deliveredEl.textContent = stats.delivered || 0;
-        
-        const outstandingEl = document.getElementById('outstanding-amount');
-        if (outstandingEl) outstandingEl.textContent = `$${(stats.outstanding || 0).toLocaleString()}`;
+            document.getElementById('total-followups').textContent = stats.total || 0;
+            document.getElementById('pending-followups').textContent = stats.pending || 0;
+            document.getElementById('delivered-followups').textContent = stats.delivered || 0;
+            document.getElementById('outstanding-amount').textContent = `$${(stats.outstanding || 0).toLocaleString()}`;
+        }
     } catch (error) {
         console.error('Error loading stats:', error);
-        // Don't redirect for data errors
     }
 }
 
@@ -525,40 +371,20 @@ async function loadStats() {
 async function loadInvoices() {
     try {
         const response = await fetch('/api/invoices');
-        
-        // Only redirect for auth errors
-        if (response.status === 401 || response.status === 403) {
-            window.location.href = '/login';
-            return;
-        }
-        
-        let invoices = [];
         if (response.ok) {
-            try {
-                invoices = await response.json();
-            } catch (e) {
-                console.warn('Could not parse invoices:', e);
-            }
+            const invoices = await response.json();
+            displayInvoices(invoices);
         }
-        
-        displayInvoices(invoices);
     } catch (error) {
         console.error('Error loading invoices:', error);
-        const tbody = document.getElementById('invoices-tbody');
-        if (tbody) {
-            tbody.innerHTML = 
-                '<tr><td colspan="6" class="px-4 py-8 text-center text-red-500">Error loading invoices</td></tr>';
-        }
+        document.getElementById('invoices-tbody').innerHTML = 
+            '<tr><td colspan="6" class="px-4 py-8 text-center text-red-500">Error loading invoices</td></tr>';
     }
 }
 
 // Display invoices in table
 function displayInvoices(invoices) {
     const tbody = document.getElementById('invoices-tbody');
-    if (!tbody) {
-        console.warn('Invoices tbody element not found');
-        return;
-    }
 
     if (!invoices || invoices.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">No invoices found</td></tr>';
