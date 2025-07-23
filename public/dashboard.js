@@ -58,8 +58,9 @@ async function updateStats() {
       return;
     }
 
-    const stats = await statsResponse.json();
-    const analytics = await analyticsResponse.json();
+const stats = statsResponse.ok ? await statsResponse.json().catch(() => ({})) : {};
+const analytics = analyticsResponse.ok ? await analyticsResponse.json().catch(() => ({})) : {};
+
 
     // Update payment analytics
     document.getElementById('avgDaysToPayment').textContent = 
@@ -91,8 +92,7 @@ async function updateInvoices() {
       return;
     }
 
-    const invoices = await response.json();
-
+  const invoices = response.ok ? await response.json().catch(() => []) : [];
     const tbody = document.getElementById('invoiceTableBody');
     tbody.innerHTML = invoices.map(invoice => `
       <tr>
@@ -114,7 +114,6 @@ async function updateInvoices() {
     `).join('');
   } catch (error) {
     console.error('Error updating invoices:', error);
-    redirectToLogin();
   }
 }
 
@@ -199,9 +198,7 @@ if (userNameEl) {
 const companyNameEl = document.getElementById('company-name');
 if (companyNameEl) {
   companyNameEl.textContent = userInfo.company_name || 'Your Company';
-}
-      loadDashboardData();
-    }
+}    }
   })
   .catch(error => {
     console.error('Authentication error:', error);
