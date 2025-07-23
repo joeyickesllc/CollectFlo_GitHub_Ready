@@ -65,17 +65,20 @@ exports.login = async (req, res) => {
     // ------------------------------------------------------------------
     // Generate JWT tokens & set secure cookies
     // ------------------------------------------------------------------
-let accessToken, refreshToken;
-try {
-  accessToken  = jwtService.generateAccessToken(user);
-  refreshToken = jwtService.generateRefreshToken(user);
-} catch (tokenErr) {
-  logger.error('JWT generation failed during login', { error: tokenErr });
-  return res.status(500).json({
-    success : false,
-    message : 'Authentication error – please try again later'
-  });
-}
+    let accessToken, refreshToken;
+    try {
+      accessToken  = jwtService.generateAccessToken(user);
+      refreshToken = jwtService.generateRefreshToken(user);
+    } catch (tokenErr) {
+      logger.error('JWT generation failed during login', { error: tokenErr });
+      return res.status(500).json({
+        success : false,
+        message : 'Authentication error – please try again later'
+      });
+    }
+
+    // Persist tokens in HTTP-only cookies so subsequent requests are authenticated
+    setAuthCookies(req, res, accessToken, refreshToken);
 
     // Create session for backwards compatibility with session-based code
     req.session.user = {

@@ -104,6 +104,7 @@ describe('Auth Controller - Login', () => {
     expect(res.json).toHaveBeenCalledWith({
       success: true,
       message: 'Login successful',
+      redirect: '/dashboard',
       user: {
         id: 1,
         email: 'test@example.com',
