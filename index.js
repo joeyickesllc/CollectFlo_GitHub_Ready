@@ -16,10 +16,7 @@ const { applySecurityMiddleware } = require('./backend/middleware/securityMiddle
 const cookieParser = require('cookie-parser');   // <-- added
 const { optionalAuth } = require('./backend/middleware/jwtAuthMiddleware'); // new import
 const jwtService   = require('./backend/services/jwtService'); // JWT verification
-<<<<<<< HEAD
 const qboController = require('./backend/controllers/qboController'); // QuickBooks OAuth controller
-=======
->>>>>>> 54a0db131b87d99dd424663ed5c47ac915410d7c
 
 // Application modules
 const db = require('./backend/db/connection');
@@ -27,155 +24,124 @@ const apiRoutes = require('./backend/routes/api');
 const logger = require('./backend/services/logger');
 const jobQueue = require('./backend/services/jobQueue');
 
-// Migration runner
-const runMigrations = require('./backend/scripts/runMigrations');
-// Tracking middleware
-const { trackPageVisit } = require('./backend/middleware/trackingMiddleware');
+// Initialize Express application
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-// ---------------------------------------------------------------------------
-// Redis / Job-Queue mode check
-// ---------------------------------------------------------------------------
-if (jobQueue.usingMockImplementation) {
-  logger.warn(
-    'Redis is not available – job queues running in in-memory fallback mode. ' +
-    'Jobs will NOT persist across restarts.'
-  );
+// Set up session store with PostgreSQL
+const pgSession = require('connect-pg-simple')(session);
+const sessionConfig = {
+  store: new pgSession({
+    pool: db.pool,                // Connection pool
+    tableName: 'session',         // Use a custom table to store sessions
+    createTableIfMissing: true,   // Auto-create the sessions table if missing
+  }),
+  secret: process.env.SESSION_SECRET || 'collectflo-dev-secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: parseInt(process.env.SESSION_MAX_AGE || '86400000'), // 24 hours
+    sameSite: 'lax'
+  }
+};
+
+if (process.env.NODE_ENV === 'production' && sessionConfig.cookie.secure === true) {
+  app.set('trust proxy', 1); // Trust first proxy
+  logger.info('Session cookies set to secure in production mode');
+} else {
+  logger.warn('Session cookies not set to secure mode - only use in development');
 }
 
-// Environment variables
-const PORT = process.env.PORT || 3000;
-const NODE_ENV = process.env.NODE_ENV || 'development';
-const IS_PRODUCTION = NODE_ENV === 'production';
-const IS_RENDER = process.env.RENDER === 'true';
-const SESSION_SECRET = process.env.SESSION_SECRET || 'collectflo-dev-secret';
-
-// HTTP server instance for graceful shutdown
-let server;
-
-// Create Express app
-const app = express();
-
-// ---------------------------------------------------------------------------
-// Security / Hardening middleware (helmet, xss-clean, rate-limit, etc.)
-// ---------------------------------------------------------------------------
-applySecurityMiddleware(app);
-
-// CORS configuration
+// Set up middleware
+app.use(session(sessionConfig));
+app.use(cookieParser()); // Parse cookies
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(cors({
-  origin: IS_PRODUCTION ? 
-    ['https://collectflo.com', /\.collectflo\.com$/] : 
-    'http://localhost:3000',
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://collectflo.com', 'https://www.collectflo.com'] 
+    : ['http://localhost:3000', 'http://localhost:5173'],
   credentials: true
 }));
 
-// Request logging
-if (IS_PRODUCTION) {
-  // Production: use Winston for structured logging
-  app.use((req, res, next) => {
-    const start = Date.now();
-    
-    // Log when the response finishes
-    res.on('finish', () => {
-      const duration = Date.now() - start;
-      const logLevel = res.statusCode >= 400 ? 'warn' : 'info';
-      
-      logger[logLevel](`HTTP ${req.method} ${req.url} ${res.statusCode} - ${duration}ms`, {
-        method: req.method,
-        url: req.url,
-        statusCode: res.statusCode,
-        duration,
-        contentLength: res.get('content-length'),
-        requestId: req.headers['x-request-id'] || `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        ip: req.ip,
-        userAgent: req.headers['user-agent']
-      });
-    });
-    
-    next();
-  });
-} else {
-  // Development: use Morgan for console-friendly logs
+// Apply security middleware (rate limiting, CSRF protection, etc.)
+applySecurityMiddleware(app);
+
+// Request logging in development
+if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
 }
 
-// Body parsing middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// ---------------------------------------------------------------------------
-// Cookie parsing middleware (must run BEFORE session middleware so that
-// signed cookies such as accessToken / refreshToken are available)
-// ---------------------------------------------------------------------------
-app.use(cookieParser(SESSION_SECRET));
-
-// ---------------------------------------------------------------------------
-// Session configuration  (simple, memory-based for maximum reliability)
-// ---------------------------------------------------------------------------
-// NOTE:
-// We intentionally use express-session's in-memory store.  This eliminates all
-// database-connection-related failures (e.g. SSL/TLS to PG) at the cost of
-// clearing sessions on server restart—acceptable for reliability.
-
-app.set('trust proxy', 1); // secure cookies behind Render proxy
-
-app.use(session({
-  secret: SESSION_SECRET,
-  resave: false,
-  saveUninitialized: true,
-  // MemoryStore is automatically used when no `store` provided
-  cookie: {
-    secure: IS_PRODUCTION,
-    httpOnly: true,
-    sameSite: 'lax',
-    path: '/',
-    maxAge: parseInt(process.env.SESSION_TTL_MS || 86_400_000, 10) // 24 h default
-  }
-}));
-
-// Optional: lightweight debug log when a new session is generated
-app.use((req, res, next) => {
-  if (!req.session.initialised) {
-    logger.info('New session created', { sessionID: req.sessionID });
-    req.session.initialised = true;
-  }
-  next();
-});
-
-// ---------------------------------------------------------------------------
-// Page-visit tracking
-// ---------------------------------------------------------------------------
-// Must be registered BEFORE static file middleware so it only runs once per
-// real page view and not for every asset request.
-app.use(trackPageVisit);
-
 // Configure file uploads
-const upload = multer({
-  dest: path.join(__dirname, 'uploads'),
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, 'uploads'));
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${file.originalname}`);
   }
 });
 
-// Root route handler - MOVED BEFORE static file middleware
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'landing.html'));
+const upload = multer({ 
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
 });
 
-// Serve static files from the public directory
+// Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
-// API routes
+// Authentication check middleware for protected routes
+app.use((req, res, next) => {
+  // Skip auth check for public routes
+  const publicPaths = [
+    '/', '/index.html', '/login.html', '/signup.html', '/beta.html', 
+    '/beta-signup.html', '/api/login', '/api/signup', '/api/auth/login', 
+    '/api/auth/signup', '/api/beta-signup', '/api/check-auth', 
+    '/api/auth/check', '/api/auth/refresh', '/api/auth-debug',
+    '/health', '/favicon.ico', '/robots.txt', '/sitemap.xml',
+    '/css', '/js', '/images', '/auth-test.html', '/auth-diagnostics.html',
+    '/login-debug.html', '/beta-stats.html'
+  ];
 
-// ---------------------------------------------------------------------------
-// Inject optionalAuth ONLY for the auth-debug endpoint so that downstream
-// handler has access to req.user when available, without enforcing auth.
-// Must be registered before the main /api router for correct order.
-// ---------------------------------------------------------------------------
-app.use('/api/auth-debug', optionalAuth);
+  // Check if the path starts with any of the public paths
+  const isPublicPath = publicPaths.some(publicPath => {
+    return req.path === publicPath || 
+           req.path.startsWith(`${publicPath}/`) ||
+           (publicPath.endsWith('.html') && req.path === publicPath.replace('.html', ''));
+  });
 
+  // Also allow API routes to handle their own auth
+  const isApiPath = req.path.startsWith('/api/');
+
+  if (isPublicPath || isApiPath) {
+    return next();
+  }
+
+  // For protected routes, check JWT token
+  const token = req.cookies.accessToken || 
+                (req.headers.authorization && req.headers.authorization.split(' ')[1]);
+
+  if (!token) {
+    logger.debug(`Auth redirect: ${req.path} (no token)`);
+    return res.redirect('/login.html?redirect=' + encodeURIComponent(req.path));
+  }
+
+  try {
+    // Verify token (will throw if invalid)
+    const decoded = jwtService.verifyAccessToken(token);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    logger.debug(`Auth redirect: ${req.path} (${err.message})`);
+    res.redirect('/login.html?redirect=' + encodeURIComponent(req.path));
+  }
+});
+
+// API Routes
 app.use('/api', apiRoutes);
 
-<<<<<<< HEAD
 // ---------------------------------------------------------------------------
 // QuickBooks OAuth routes
 // ---------------------------------------------------------------------------
@@ -193,147 +159,87 @@ app.get(
   optionalAuth,
   (req, res, next) => qboController.handleOAuthCallback(req, res, next)
 );
-=======
-// QuickBooks OAuth routes
-app.get('/auth/qbo', (req, res) => {
-  // This will be implemented in a separate controller
-  res.status(501).send('QuickBooks OAuth flow not implemented yet');
-});
->>>>>>> 54a0db131b87d99dd424663ed5c47ac915410d7c
 
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    environment: NODE_ENV
+    uptime: process.uptime()
   });
 });
 
-// Serve HTML pages for various routes
-const htmlRoutes = [
-  { path: '/login', file: 'login.html' },
-  { path: '/signup', file: 'signup.html' },
-  { path: '/dashboard', file: 'dashboard.html', auth: true },
-  { path: '/settings', file: 'settings.html', auth: true },
-  { path: '/templates', file: 'templates.html', auth: true },
-  { path: '/onboarding', file: 'onboarding.html', auth: true },
-  { path: '/beta', file: 'beta.html' },
-  { path: '/beta-signup', file: 'beta-signup.html' },
-  { path: '/beta-onboarding', file: 'beta-onboarding.html', auth: true },
-  { path: '/beta-stats', file: 'beta-stats.html', auth: true },
-  { path: '/pay/:invoiceId', file: 'pay.html' },
-  { path: '/payment-success', file: 'payment-success.html' },
-  { path: '/privacy', file: 'privacy.html' },
-  { path: '/eula', file: 'eula.html' },
-  { path: '/help', file: 'help.html' }
-];
-
-// Register HTML routes
-htmlRoutes.forEach(route => {
-  app.get(route.path, (req, res) => {
-    // Check if route requires authentication
-    if (route.auth) {
-      const token = req.cookies && req.cookies.accessToken;
-
-      // No token at all → redirect to login
-      if (!token) {
-        return res.redirect('/login?redirect=' + encodeURIComponent(req.path));
-      }
-
-      // Verify token; clear cookies & redirect on failure
-      try {
-        jwtService.verifyToken(token, 'access');
-      } catch (err) {
-        // Invalid / expired token – clean up and force re-login
-        res.clearCookie('accessToken', { path: '/' });
-        res.clearCookie('refreshToken', { path: '/' });
-        return res.redirect('/login?redirect=' + encodeURIComponent(req.path));
-      }
-    }
-    
-    res.sendFile(path.join(__dirname, 'public', route.file));
-  });
-});
-
-// Catch-all route for 404s
+// Handle 404s
 app.use((req, res) => {
-  res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
+  if (req.accepts('html')) {
+    return res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
+  }
+  
+  if (req.accepts('json')) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  
+  res.status(404).type('txt').send('Not found');
 });
 
-// Error handling middleware
+// Global error handler
 app.use((err, req, res, next) => {
-  logger.error('Unhandled error in API route: ' + req.method + ' ' + req.url, {
+  const statusCode = err.statusCode || 500;
+  
+  // Log the error
+  logger.error(`Error: ${err.message}`, {
+    stack: err.stack,
+    path: req.path,
     method: req.method,
-    url: req.url,
-    error: err.message,
-    stack: err.stack
+    statusCode
   });
   
-  res.status(err.status || 500).json({
-    error: IS_PRODUCTION ? 'An unexpected error occurred' : err.message
-  });
+  // Send appropriate response based on request type
+  if (req.accepts('html')) {
+    res.status(statusCode).send(`
+      <html>
+        <head><title>Error</title></head>
+        <body>
+          <h1>Error</h1>
+          <p>${process.env.NODE_ENV === 'production' ? 'An error occurred' : err.message}</p>
+          ${process.env.NODE_ENV === 'production' ? '' : `<pre>${err.stack}</pre>`}
+          <p><a href="/">Return to home page</a></p>
+        </body>
+      </html>
+    `);
+  } else {
+    res.status(statusCode).json({
+      error: process.env.NODE_ENV === 'production' ? 'An error occurred' : err.message,
+      stack: process.env.NODE_ENV === 'production' ? undefined : err.stack
+    });
+  }
 });
 
-// Application startup
-async function startServer() {
+// Start the server
+app.listen(PORT, async () => {
+  logger.info(`Server running on port ${PORT}`);
+  
   try {
-    // Run database migrations
-    await runMigrations();
+    // Initialize job queue
+    await jobQueue.init();
+    logger.info('Job queue initialized successfully');
     
-    // Start the server and keep a reference for graceful shutdown
-    server = app.listen(PORT, () => {
-      logger.info(`CollectFlo server listening on port ${PORT} in ${NODE_ENV} mode`);
-    });
-
-    // Initialize scheduled jobs only after successful start
-    try {
-      require('./services/scheduler');
-      logger.info('Scheduler initialised successfully');
-    } catch (schedErr) {
-      logger.error('Scheduler failed to initialise', { error: schedErr });
-      // Do NOT crash the whole app – core API can still function without scheduler
+    // Run database migrations if needed
+    if (process.env.AUTO_RUN_MIGRATIONS === 'true') {
+      const { runMigrations } = require('./backend/scripts/runMigrations');
+      await runMigrations();
+      logger.info('Database migrations completed successfully');
     }
   } catch (error) {
-    logger.error('Failed to start application due to startup error', { error });
-    process.exit(1); // Exit with failure so Render restarts / reports the issue
+    logger.error('Error during server initialization:', error);
   }
-}
-
-// Start the application
-startServer();
+});
 
 // Handle graceful shutdown
-process.on('SIGTERM', gracefulShutdown);
-process.on('SIGINT', gracefulShutdown);
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM received, shutting down gracefully');
+  // Close database connections, job queues, etc.
+  process.exit(0);
+});
 
-async function gracefulShutdown() {
-  logger.info('Received shutdown signal, closing connections...');
-  
-  // Close the HTTP server first to stop accepting new requests
-  if (server) {
-    server.close();
-  }
-  
-  try {
-    // Shutdown job queues
-    try {
-      await jobQueue.shutdown();
-    } catch (jqErr) {
-      logger.error('Error shutting down job queues', { error: jqErr });
-    }
-
-    // Close database connections
-    try {
-      await db.close();
-    } catch (dbErr) {
-      logger.error('Error closing database connections', { error: dbErr });
-    }
-    
-    logger.info('Graceful shutdown completed');
-    process.exit(0);
-  } catch (error) {
-    logger.error('Error during graceful shutdown', { error });
-    process.exit(1);
-  }
-}
+module.exports = app; // Export for testing

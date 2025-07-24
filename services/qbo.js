@@ -1,12 +1,6 @@
-
 const axios = require('axios');
-<<<<<<< HEAD
 const { getTokens } = require('./tokenStore');
 const db = require('../backend/db/connection');
-=======
-const { getTokens } = require('../tokenstore');
-const db = require('../database.js');
->>>>>>> 54a0db131b87d99dd424663ed5c47ac915410d7c
 
 const QBO_API_BASE = process.env.NODE_ENV === 'production' 
   ? 'https://quickbooks.api.intuit.com/v3/company'
@@ -30,7 +24,6 @@ function checkRateLimit() {
 }
 
 async function logError(error, context) {
-<<<<<<< HEAD
   try {
     await db.query(
       `INSERT INTO error_logs (error_message, error_stack, context)
@@ -46,16 +39,6 @@ async function logError(error, context) {
 
 async function makeQBORequest(endpoint, params = {}, userId = null) {
   const tokens = await getTokens(userId);
-=======
-  db.prepare(`
-    INSERT INTO error_logs (error_message, error_stack, context, created_at)
-    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-  `).run(error.message, error.stack, JSON.stringify(context));
-}
-
-async function makeQBORequest(endpoint, params = {}, userId = null) {
-  const tokens = getTokens(userId);
->>>>>>> 54a0db131b87d99dd424663ed5c47ac915410d7c
   if (!tokens?.access_token || !tokens?.realmId) {
     throw new Error('QuickBooks not connected. Please connect your QuickBooks account first.');
   }
@@ -84,11 +67,7 @@ async function makeQBORequest(endpoint, params = {}, userId = null) {
         await refreshAccessToken();
         
         // Retry the request with new token
-<<<<<<< HEAD
         const newTokens = await getTokens(userId);
-=======
-        const newTokens = getTokens();
->>>>>>> 54a0db131b87d99dd424663ed5c47ac915410d7c
         const retryResponse = await axios.get(
           `${QBO_API_BASE}/${newTokens.realmId}${endpoint}`,
           {
