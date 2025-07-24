@@ -16,7 +16,10 @@ const betaController = require('../controllers/betaController');
 // const invoiceController = require('../controllers/invoiceController');
 // const qboController = require('../controllers/qboController');
 // const testController = require('../controllers/testController');
+<<<<<<< HEAD
 const qboController = require('../controllers/qboController');
+=======
+>>>>>>> 54a0db131b87d99dd424663ed5c47ac915410d7c
 
 // Import middleware
 const {
@@ -279,6 +282,7 @@ router.get('/beta-stats', requireAuth, async (req, res, next) => {
 /**
  * QuickBooks Integration Routes
  */
+<<<<<<< HEAD
 router.get(
   '/qbo/status',
   requireAuth,
@@ -296,6 +300,25 @@ router.get(
   requireAuth,
   (req, res, next) => qboController.getCompanyInfo(req, res, next)
 );
+=======
+router.get('/qbo/status', requireAuth, async (req, res, next) => {
+  try {
+    // Will be replaced with qboController.getStatus
+    res.status(501).json({ message: 'Not implemented yet' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/qbo/disconnect', requireAuth, async (req, res, next) => {
+  try {
+    // Will be replaced with qboController.disconnect
+    res.status(501).json({ message: 'Not implemented yet' });
+  } catch (error) {
+    next(error);
+  }
+});
+>>>>>>> 54a0db131b87d99dd424663ed5c47ac915410d7c
 
 /**
  * Test Routes (for development only)

@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Welcome to CollectFlo Beta</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script src="/nav.js"></script>
+</head>
+<body class="bg-gray-50">
+  <div id="nav-placeholder"></div>
+
+  <div class="container mx-auto px-4 py-16">
+    <div class="max-w-2xl mx-auto">
+      <div class="text-center mb-8">
+        <div class="w-20 h-20 bg-gradient-to-r from-purple-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+        </div>
+        <div class="mb-4">
+          <span class="bg-purple-100 text-purple-800 text-sm font-semibold px-3 py-1 rounded-full">
+            🚀 BETA USER
+          </span>
+        </div>
+        <h1 class="text-3xl font-bold mb-4">Welcome to the CollectFlo Beta!</h1>
+        <p class="text-xl text-gray-600 mb-2">Thank you for being part of our exclusive beta program.</p>
+        <p class="text-green-600 font-semibold text-lg">You now have <strong>lifetime free access</strong> to CollectFlo!</p>
+      </div>
+
+      <div class="bg-white p-8 rounded-lg shadow-lg mb-8">
+        <div class="bg-purple-50 p-6 rounded-lg border border-purple-200 mb-6">
+          <h3 class="text-lg font-semibold text-purple-800 mb-3">Your Beta Benefits:</h3>
+          <ul class="text-purple-700 space-y-2">
+            <li class="flex items-center">
+              <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+              Lifetime free access to all CollectFlo features
+            </li>
+            <li class="flex items-center">
+              <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+              Priority customer support
+            </li>
+            <li class="flex items-center">
+              <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+              Direct influence on product development
+            </li>
+            <li class="flex items-center">
+              <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+              First access to new features and updates
+            </li>
+          </ul>
+        </div>
+
+        <h2 class="text-2xl font-semibold mb-6 text-center">Let's Get You Started</h2>
+
+        <div class="space-y-6" id="onboardingSteps">
+          <div class="flex items-start space-x-4">
+            <div id="step1Circle" class="flex-shrink-0 w-8 h-8 bg-purple-600 text-white rounded-full flex items-center justify-center text-sm font-bold">1</div>
+            <div>
+              <h3 class="text-lg font-medium mb-2">Connect Your QuickBooks Account</h3>
+              <p class="text-gray-600 mb-4">Securely link your QuickBooks Online account so CollectFlo can automatically track your invoices and payments.</p>
+            </div>
+          </div>
+
+          <div id="qboConnectButton" class="text-center my-6">
+            <a href="/auth/qbo?redirect=beta-onboarding" class="inline-flex items-center px-6 py-3 bg-purple-600 text-white text-lg font-medium rounded-lg hover:bg-purple-700 transition-colors">
+              <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+              </svg>
+              Connect QuickBooks Now
+            </a>
+          </div>
+
+          <div class="flex items-start space-x-4">
+            <div id="step2Circle" class="flex-shrink-0 w-8 h-8 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-sm font-bold">2</div>
+            <div>
+              <h3 class="text-lg font-medium mb-2">Customize Your Settings</h3>
+              <p class="text-gray-600 mb-2">After connecting QuickBooks, visit your settings to personalize your company information and follow-up preferences.</p>
+            </div>
+          </div>
+
+          <div id="settingsButton" class="text-center my-6" style="display: none;">
+            <a href="/settings?redirect=beta-onboarding" class="inline-flex items-center px-6 py-3 bg-purple-600 text-white text-lg font-medium rounded-lg hover:bg-purple-700 transition-colors">
+              <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              </svg>
+              Customize Your Settings Now
+            </a>
+          </div>
+
+          <div class="flex items-start space-x-4">
+            <div id="step3Circle" class="flex-shrink-0 w-8 h-8 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-sm font-bold">3</div>
+            <div>
+              <h3 class="text-lg font-medium mb-2">Start Automating</h3>
+              <p id="step3Text" class="text-gray-600">Experience the power of automated follow-ups and watch your cash flow improve.</p>
+            </div>
+          </div>
+        </div>
+
+        <div id="dashboardButton" class="mt-8 text-center" style="display: none;">
+          <a href="/dashboard" class="inline-flex items-center px-6 py-3 bg-purple-600 text-white text-lg font-medium rounded-lg hover:bg-purple-700 transition-colors">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+            </svg>
+            Go to Dashboard
+          </a>
+        </div>
+
+        <div class="mt-6 p-4 bg-amber-50 rounded-lg border border-amber-200">
+          <div class="flex items-start">
+            <svg class="w-5 h-5 text-amber-600 mt-0.5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+            </svg>
+            <div class="text-sm text-amber-800">
+              <p class="font-medium mb-1">Help Us Improve!</p>
+              <p>As a beta user, your feedback is invaluable. Please don't hesitate to reach out with suggestions, issues, or feature requests. Your input directly shapes the future of CollectFlo.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="text-center space-y-4">
+        <div class="flex justify-center space-x-6">
+          <a href="/help" class="text-purple-600 hover:text-purple-800 font-medium">
+            📧 Send Feedback
+          </a>
+          <a href="/help" class="text-purple-600 hover:text-purple-800 font-medium">
+            ❓ Get Support
+          </a>
+        </div>
+        <p class="text-gray-500 text-sm">Thank you for being part of our journey to revolutionize automated collections!</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- LinkedIn Insight Tag -->
+    <script type="text/javascript">
+    try {
+      _linkedin_partner_id = "7391572";
+      window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
+      window._linkedin_data_partner_ids.push(_linkedin_partner_id);
+    } catch (e) {
+      console.warn('LinkedIn tracking setup failed:', e);
+    }
+    </script>
+    <script type="text/javascript">
+    try {
+      (function(l) {
+        if (!l){window.lintrk = function(a,b){window.lintrk.q.push([a,b])};
+        window.lintrk.q=[]}
+        var s = document.getElementsByTagName("script")[0];
+        var b = document.createElement("script");
+        b.type = "text/javascript";b.async = true;
+        b.src = "https://snap.licdn.com/li.js";
+        s.parentNode.insertBefore(b, s);
+      })(window.lintrk);
+    } catch (e) {
+      console.warn('LinkedIn tracking script failed:', e);
+    }
+    </script>
+
+  <script>
+    // Check if user is coming from successful beta signup
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('from') === 'beta-signup') {
+      // Show a celebration animation or confetti effect
+      document.body.classList.add('animate-fadeIn');
+    }
+
+    // Check onboarding progress and update UI accordingly
+    async function checkOnboardingProgress() {
+      try {
+        // Check QBO connection status
+        const qboResponse = await fetch('/qbo/company-info');
+        const qboConnected = qboResponse.ok;
+
+        // Check if settings have been configured
+        const settingsResponse = await fetch('/api/settings');
+        const settings = await settingsResponse.json();
+        const settingsConfigured = settings.company_name && settings.email;
+
+        updateOnboardingUI(qboConnected, settingsConfigured);
+
+      } catch (error) {
+        console.error('Error checking onboarding progress:', error);
+      }
+    }
+
+    function updateOnboardingUI(qboConnected, settingsConfigured) {
+      const step1Circle = document.getElementById('step1Circle');
+      const step2Circle = document.getElementById('step2Circle');
+      const step3Circle = document.getElementById('step3Circle');
+      const qboButton = document.getElementById('qboConnectButton');
+      const settingsButton = document.getElementById('settingsButton');
+      const dashboardButton = document.getElementById('dashboardButton');
+      const step3Text = document.getElementById('step3Text');
+
+      if (qboConnected) {
+        // Step 1 completed
+        step1Circle.className = 'flex-shrink-0 w-8 h-8 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-sm font-bold';
+        qboButton.style.display = 'none';
+
+        if (settingsConfigured) {
+          // Step 2 completed
+          step2Circle.className = 'flex-shrink-0 w-8 h-8 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-sm font-bold';
+          settingsButton.style.display = 'none';
+
+          // Step 3 active
+          step3Circle.className = 'flex-shrink-0 w-8 h-8 bg-purple-600 text-white rounded-full flex items-center justify-center text-sm font-bold';
+          step3Text.textContent = 'You\'re all set! Visit your dashboard to see your synced invoices and start the automated follow-up flow.';
+          dashboardButton.style.display = 'block';
+        } else {
+          // Step 2 active
+          step2Circle.className = 'flex-shrink-0 w-8 h-8 bg-purple-600 text-white rounded-full flex items-center justify-center text-sm font-bold';
+          settingsButton.style.display = 'block';
+        }
+      }
+    }
+
+    // Initialize onboarding progress check
+    checkOnboardingProgress();
+  </script>
+</body>
+</html>

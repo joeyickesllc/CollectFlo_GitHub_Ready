@@ -1,0 +1,41 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redirecting to Payment - CollectFlo</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50">
+    <div class="container mx-auto px-4 py-16">
+        <div class="max-w-md mx-auto bg-white rounded-lg shadow-lg p-8 text-center">
+            <div class="mb-6">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            </div>
+            <h1 class="text-xl font-semibold mb-4">Redirecting to QuickBooks Payment</h1>
+            <p class="text-gray-600 mb-4">Please wait while we redirect you to the secure QuickBooks payment portal...</p>
+            <p class="text-sm text-gray-500">Powered by Intuit Payments</p>
+        </div>
+    </div>
+
+    <script>
+        // Get URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const invoiceId = urlParams.get('invoice');
+        const amount = urlParams.get('amount');
+
+        if (invoiceId && amount) {
+            // Simulate redirect to QuickBooks payment portal
+            // In production, this would be the actual QuickBooks payment URL
+            setTimeout(() => {
+                // For now, redirect back to a success page
+                // In production, replace with actual QuickBooks payment URL
+                window.location.href = `/payment-success?invoice=${invoiceId}`;
+            }, 2000);
+        } else {
+            window.location.href = '/';
+        }
+    </script>
+</body>
+</html>

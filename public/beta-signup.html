@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Beta Signup - CollectFlo</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50">
+  <!-- Simple Navigation -->
+  <nav class="bg-white border-b border-gray-200 py-4">
+    <div class="container mx-auto px-4 flex justify-between items-center">
+      <div class="text-2xl font-bold text-blue-600">CollectFlo</div>
+      <div class="space-x-4">
+        <a href="/" class="text-blue-600 hover:text-blue-800">Back to Home</a>
+        <a href="/login" class="text-blue-600 hover:text-blue-800">Log In</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-16">
+    <div class="max-w-md mx-auto">
+      <div class="text-center mb-6">
+        <span class="bg-purple-100 text-purple-800 text-sm font-semibold px-3 py-1 rounded-full">
+          🚀 BETA ACCESS
+        </span>
+      </div>
+      <h1 class="text-3xl font-bold mb-6 text-center">Get Lifetime Free Access</h1>
+      <p class="text-gray-600 mb-4 text-center">Join our exclusive beta program and get CollectFlo for free, forever!</p>
+      <p class="text-green-600 mb-8 text-center font-semibold">Beta users get lifetime access at $0/month</p>
+
+      <form id="beta-signup-form" class="space-y-6 bg-white p-8 rounded-lg shadow">
+        <div>
+          <label class="block text-sm font-medium mb-1">Company Name</label>
+          <input type="text" id="company_name" required class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-purple-500">
+          <p class="text-xs text-gray-500 mt-1">Your company or organization name</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Full Name</label>
+          <input type="text" id="name" required class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-purple-500">
+          <p class="text-xs text-gray-500 mt-1">Your first and last name</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Work Email</label>
+          <input type="email" id="email" required class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-purple-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Password</label>
+          <input type="password" id="password" required class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-purple-500">
+          <p class="text-xs text-gray-500 mt-1">Minimum 8 characters, include a number and a letter</p>
+        </div>
+
+        <div class="bg-purple-50 p-4 rounded-lg border border-purple-200">
+          <h3 class="text-sm font-semibold text-purple-800 mb-2">Beta Program Benefits:</h3>
+          <ul class="text-sm text-purple-700 space-y-1">
+            <li>✓ Lifetime free access to CollectFlo</li>
+            <li>✓ All premium features included</li>
+            <li>✓ Priority support</li>
+            <li>✓ Influence product development</li>
+          </ul>
+        </div>
+
+        <button type="submit" id="submit-button" class="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 flex items-center justify-center">
+          <svg id="spinner" class="hidden animate-spin h-5 w-5 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z"></path>
+          </svg>
+          <span id="submit-label">Join Beta Program</span>
+        </button>
+      </form>
+
+      <!-- Toast notification container -->
+      <div id="toast-container" class="fixed inset-x-0 top-4 flex flex-col items-center space-y-2 z-50"></div>
+
+      <!-- Hidden debug console (enable via DevTools for troubleshooting) -->
+      <pre id="debug-log" class="hidden mt-6 w-full bg-gray-100 text-xs p-3 rounded overflow-auto"></pre>
+    </div>
+  </div>
+
+  <script>
+    /* ---------------------------------------------------------------------
+     *  Early auth-check – if the session cookie already exists
+     *  (for example immediately after successful signup) we’ll skip
+     *  this page entirely and go straight to onboarding.
+     * ------------------------------------------------------------------- */
+    async function checkExistingAuth() {
+      try {
+        console.log('[β-signup] Checking existing auth…');
+        const res = await fetch('/api/check-auth', {
+          credentials: 'include',
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          console.log('[β-signup] /api/check-auth →', data);
+          if (data.isAuthenticated) {
+            console.log('[β-signup] User already authenticated → redirecting');
+            window.location.replace('/beta-onboarding');
+            return true; // handled
+          }
+        }
+      } catch (err) {
+        console.warn('[β-signup] Auth check failed (continuing)', err);
+      }
+      return false;
+    }
+
+    /* ---------------------------------------------------------------------
+     *  Toast helpers
+     * ------------------------------------------------------------------- */
+    function showToast(type, message) {
+      const colors = {
+        success: { bg: 'bg-green-600', txt: 'text-white' },
+        error:   { bg: 'bg-red-600',   txt: 'text-white' },
+        warn:    { bg: 'bg-yellow-500',txt: 'text-white' }
+      };
+
+      const toast = document.createElement('div');
+     toast.className = `
+  ${colors[type].bg} ${colors[type].txt} px-4 py-3 rounded shadow-lg
+  flex items-center max-w-md w-full cursor-pointer
+`;
+toast.innerHTML = `
+  <span class="flex-1">${message}</span>
+`;
+
+      toast.addEventListener('click', () => toast.remove());
+      document.getElementById('toast-container').appendChild(toast);
+
+      // Auto-dismiss
+      setTimeout(() => toast.remove(), 4000);
+    }
+
+    function validateForm() {
+      const company_name = document.getElementById('company_name').value.trim();
+      const name = document.getElementById('name').value.trim();
+      const email = document.getElementById('email').value.trim().toLowerCase();
+      const password = document.getElementById('password').value;
+      
+      // Basic validation
+      if (!company_name || company_name.length < 2) {
+        showToast('error', 'Company name must be at least 2 characters long.');
+        return false;
+      }
+      
+      if (!name || name.length < 2) {
+        showToast('error', 'Full name must be at least 2 characters long.');
+        return false;
+      }
+      
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        showToast('error', 'Please enter a valid email address.');
+        return false;
+      }
+      
+      if (password.length < 8) {
+        showToast('error', 'Password must be at least 8 characters long.');
+        return false;
+      }
+      
+      if (!/[a-zA-Z]/.test(password) || !/\d/.test(password)) {
+        showToast('error', 'Password must include at least one letter and one number.');
+        return false;
+      }
+      
+      return true;
+    }
+
+    async function handleBetaSignup(event) {
+      event.preventDefault();
+
+      /* ----- validation ----- */
+      if (!validateForm()) return;
+
+      /* ----- loading state ----- */
+      const btn    = document.getElementById('submit-button');
+      const label  = document.getElementById('submit-label');
+      const spinner= document.getElementById('spinner');
+      btn.disabled = true;
+      label.textContent = 'Submitting…';
+      spinner.classList.remove('hidden');
+
+      /* ----- gather data  ----- */
+      const companyName = document.getElementById('company_name').value.trim();
+      const fullName    = document.getElementById('name').value.trim();
+      const email       = document.getElementById('email').value.trim().toLowerCase();
+      const password    = document.getElementById('password').value;
+
+      const payload = {
+        // what backend expects
+        company_name: companyName,
+        companyName,
+        name: fullName,
+        fullName,
+        email,
+        password,
+        betaUser: true
+      };
+
+      try {
+        /* --------------------------------------------------------------
+         *  Send signup request
+         *  ----------------------------------------------------------- */
+        console.log('[β-signup] sending payload', payload);
+
+        const res  = await fetch('/api/beta-signup', {
+          method : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body   : JSON.stringify(payload)
+        });
+
+        const data = await res.json().catch(() => ({}));
+        console.log('[β-signup] response', res.status, data);
+
+        if (res.ok) {
+          /* ----------------------------------------------------------
+           *  SUCCESS  – server has ALREADY created the session cookie
+           *  ----------------------------------------------------------
+           *  No separate login is required; we can go straight to the
+           *  onboarding page.  The server returns a `redirect` field
+           *  we honour, or we fall back to the default.
+           * -------------------------------------------------------- */
+          showToast(
+            'success',
+            "You're in! Setting up your account & redirecting…"
+          );
+
+          setTimeout(() => {
+            window.location.href = data.redirect || '/beta-onboarding?from=beta-signup';
+          }, 1500);
+        } else if (res.status === 400 && data.errors?.length) {
+          showToast('error', data.errors[0].msg || 'Validation error.');
+        } else {
+          showToast('error', data.message || 'Something went wrong. Please try again later.');
+        }
+      } catch (err) {
+        console.error(err);
+        showToast('error', 'Network error. Please try again later.');
+      } finally {
+        console.log('[β-signup] request finished');
+        /* ----- reset loading state ----- */
+        btn.disabled = false;
+        label.textContent = 'Join Beta Program';
+        spinner.classList.add('hidden');
+      }
+    }
+
+    /* ---------------------------------------------------------------------
+     *  Init – attach event listener after DOM is ready
+     * ------------------------------------------------------------------- */
+    document.addEventListener('DOMContentLoaded', () => {
+      // If user is already logged-in (e.g. after refresh) skip form
+      checkExistingAuth().then(alreadyAuth => {
+        if (alreadyAuth) return; // redirected
+        console.log('[β-signup] No active session – binding form listener');
+        document.getElementById('beta-signup-form')
+                .addEventListener('submit', handleBetaSignup);
+      });
+    });
+  </script>
+</body>
+</html>

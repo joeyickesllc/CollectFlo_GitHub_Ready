@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CollectFlo Authentication Diagnostics</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/jwt-decode@3.1.2/build/jwt-decode.min.js"></script>
+  <style>
+    .diagnostic-section {
+      border: 1px solid #e2e8f0;
+      border-radius: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .test-result-success {
+      background-color: #d1fae5;
+      border-left: 4px solid #10b981;
+    }
+    .test-result-failure {
+      background-color: #fee2e2;
+      border-left: 4px solid #ef4444;
+    }
+    .test-result-warning {
+      background-color: #fef3c7;
+      border-left: 4px solid #f59e0b;
+    }
+    .test-result-info {
+      background-color: #e0f2fe;
+      border-left: 4px solid #3b82f6;
+    }
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .code-block {
+      font-family: monospace;
+      background-color: #f1f5f9;
+      padding: 0.5rem;
+      border-radius: 0.25rem;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <div class="container mx-auto px-4 py-8">
+    <header class="mb-8">
+      <h1 class="text-3xl font-bold text-gray-800 mb-2">CollectFlo Authentication Diagnostics</h1>
+      <p class="text-gray-600">This tool helps diagnose authentication issues by testing endpoints and displaying detailed information about the current authentication state.</p>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Authentication Status Panel -->
+      <div class="lg:col-span-2 diagnostic-section bg-white p-4 shadow rounded-lg">
+        <h2 class="text-xl font-semibold mb-4 flex items-center">
+          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          Authentication Status
+        </h2>
+        <div id="auth-status-container" class="p-4 rounded-lg bg-gray-100">
+          <div class="flex items-center mb-4">
+            <div id="auth-status-indicator" class="w-4 h-4 rounded-full bg-gray-400 mr-2"></div>
+            <span id="auth-status-text" class="font-medium">Checking authentication status...</span>
+          </div>
+          <div id="auth-details" class="mt-4 hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <h3 class="text-sm font-medium text-gray-500">User Information</h3>
+                <div id="user-info" class="mt-2 code-block"></div>
+              </div>
+              <div>
+                <h3 class="text-sm font-medium text-gray-500">Session Details</h3>
+                <div id="session-info" class="mt-2 code-block"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mt-4 flex space-x-2">
+          <button id="check-auth-btn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">
+            Check Auth Status
+          </button>
+          <button id="logout-btn" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition">
+            Logout
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Actions Panel -->
+      <div class="diagnostic-section bg-white p-4 shadow rounded-lg">
+        <h2 class="text-xl font-semibold mb-4 flex items-center">
+          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+          </svg>
+          Quick Actions
+        </h2>
+        <div class="space-y-3">
+          <button id="clear-cookies-btn" class="w-full px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition flex items-center justify-center">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+            </svg>
+            Clear All Cookies
+          </button>
+          <button id="refresh-token-btn" class="w-full px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition flex items-center justify-center">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+            Refresh Token
+          </button>
+          <button id="go-to-login-btn" class="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition flex items-center justify-center">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path>
+            </svg>
+            Go to Login Page
+          </button>
+          <button id="test-all-endpoints-btn" class="w-full px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 transition flex items-center justify-center">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+            </svg>
+            Test All Endpoints
+          </button>
+        </div>
+      </div>
+
+      <!-- JWT Token Inspector -->
+      <div class="lg:col-span-2 diagnostic-section bg-white p-4 shadow rounded-lg">
+        <h2 class="text-xl font-semibold mb-4 flex items-center">
+          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+          </svg>
+          JWT Token Inspector
+        </h2>
+        <div class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <h3 class="text-sm font-medium text-gray-500 mb-2">Access Token</h3>
+              <div id="access-token-container" class="code-block h-32 overflow-y-auto">
+                <p class="text-gray-500 italic">No access token found</p>
+              </div>
+              <div id="access-token-decoded" class="mt-2 code-block h-48 overflow-y-auto">
+                <p class="text-gray-500 italic">No decoded data available</p>
+              </div>
+              <div id="access-token-status" class="mt-2 p-2 rounded"></div>
+            </div>
+            <div>
+              <h3 class="text-sm font-medium text-gray-500 mb-2">Refresh Token</h3>
+              <div id="refresh-token-container" class="code-block h-32 overflow-y-auto">
+                <p class="text-gray-500 italic">No refresh token found</p>
+              </div>
+              <div id="refresh-token-decoded" class="mt-2 code-block h-48 overflow-y-auto">
+                <p class="text-gray-500 italic">No decoded data available</p>
+              </div>
+              <div id="refresh-token-status" class="mt-2 p-2 rounded"></div>
+            </div>
+          </div>
+          <button id="decode-tokens-btn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">
+            Refresh Token Data
+          </button>
+        </div>
+      </div>
+
+      <!-- Cookie Inspector -->
+      <div class="diagnostic-section bg-white p-4 shadow rounded-lg">
+        <h2 class="text-xl font-semibold mb-4 flex items-center">
+          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+          </svg>
+          Cookie Inspector
+        </h2>
+        <div id="cookie-list" class="code-block h-64 overflow-y-auto">
+          <p class="text-gray-500 italic">Loading cookies...</p>
+        </div>
+        <button id="refresh-cookies-btn" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">
+          Refresh Cookies
+        </button>
+      </div>
+
+      <!-- Endpoint Tester -->
+      <div class="lg:col-span-3 diagnostic-section bg-white p-4 shadow rounded-lg">
+        <h2 class="text-xl font-semibold mb-4 flex items-center">
+          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+          </svg>
+          Authentication Endpoint Tester
+        </h2>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Endpoint</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200" id="endpoint-test-table">
+              <!-- Endpoints will be populated here via JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Debug Console -->
+      <div class="lg:col-span-3 diagnostic-section bg-white p-4 shadow rounded-lg">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-semibold flex items-center">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+            Debug Console
+          </h2>
+          <button id="clear-console-btn" class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition text-sm">
+            Clear Console
+          </button>
+        </div>
+        <div id="debug-console" class="bg-gray-900 text-green-400 p-4 rounded h-64 overflow-y-auto font-mono text-sm">
+          <div>Authentication diagnostics console initialized.</div>
+          <div>Type 'help()' for available commands.</div>
+        </div>
+        <div class="mt-4 flex">
+          <input id="console-input" type="text" placeholder="Enter command..." class="flex-grow px-4 py-2 border rounded-l focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <button id="run-command-btn" class="px-4 py-2 bg-blue-600 text-white rounded-r hover:bg-blue-700 transition">
+            Run
+          </button>
+        </div>
+      </div>
+
+      <!-- Troubleshooting Guide -->
+      <div class="lg:col-span-3 diagnostic-section bg-white p-4 shadow rounded-lg">
+        <h2 class="text-xl font-semibold mb-4 flex items-center">
+          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          Troubleshooting Guide
+        </h2>
+        <div class="space-y-4">
+          <div class="p-4 border rounded">
+            <h3 class="font-medium text-lg mb-2">Common Authentication Issues</h3>
+            <ul class="list-disc pl-5 space-y-2">
+              <li><strong>Missing Tokens</strong>: If no access or refresh tokens are found, try logging in again or check if cookies are being blocked.</li>
+              <li><strong>Expired Tokens</strong>: If tokens are expired, use the "Refresh Token" button or log in again.</li>
+              <li><strong>Invalid Tokens</strong>: If tokens are invalid, clear cookies and log in again.</li>
+              <li><strong>Endpoint Mismatch</strong>: If endpoints are returning 404, make sure client code is using the correct URLs.</li>
+              <li><strong>CORS Issues</strong>: Check browser console for CORS errors which may prevent authentication requests.</li>
+            </ul>
+          </div>
+          
+          <div class="p-4 border rounded">
+            <h3 class="font-medium text-lg mb-2">JWT Authentication Flow</h3>
+            <ol class="list-decimal pl-5 space-y-2">
+              <li>User logs in with credentials at <code>/api/auth/login</code></li>
+              <li>Server validates credentials and issues access and refresh tokens as HTTP-only cookies</li>
+              <li>Client includes these cookies automatically in subsequent requests</li>
+              <li>Protected routes check for valid access token via <code>/api/auth/check</code></li>
+              <li>When access token expires, client uses refresh token to get a new one via <code>/api/auth/refresh</code></li>
+              <li>Logout at <code>/api/auth/logout</code> clears the tokens</li>
+            </ol>
+          </div>
+          
+          <div class="p-4 border rounded">
+            <h3 class="font-medium text-lg mb-2">Resolution Steps</h3>
+            <div class="space-y-4">
+              <div>
+                <h4 class="font-medium">Step 1: Check Token Status</h4>
+                <p>Use the JWT Token Inspector above to check if tokens exist and are valid.</p>
+              </div>
+              <div>
+                <h4 class="font-medium">Step 2: Test Authentication Endpoints</h4>
+                <p>Use the Endpoint Tester to check if all authentication endpoints are responding correctly.</p>
+              </div>
+              <div>
+                <h4 class="font-medium">Step 3: Clear and Recreate Session</h4>
+                <p>If issues persist, try clearing cookies and logging in again.</p>
+              </div>
+              <div>
+                <h4 class="font-medium">Step 4: Check Server Logs</h4>
+                <p>If client-side diagnostics don't resolve the issue, check server logs for more details.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Utility functions
+    function logToConsole(message, type = 'info') {
+      const console = document.getElementById('debug-console');
+      const logEntry = document.createElement('div');
+      
+      if (type === 'error') {
+        logEntry.classList.add('text-red-400');
+      } else if (type === 'success') {
+        logEntry.classList.add('text-green-400');
+      } else if (type === 'warning') {
+        logEntry.classList.add('text-yellow-400');
+      } else if (type === 'command') {
+        logEntry.classList.add('text-blue-400');
+      }
+      
+      if (typeof message === 'object') {
+        logEntry.textContent = `${new Date().toLocaleTimeString()} > ${JSON.stringify(message, null, 2)}`;
+      } else {
+        logEntry.textContent = `${new Date().toLocaleTimeString()} > ${message}`;
+      }
+      
+      console.appendChild(logEntry);
+      console.scrollTop = console.scrollHeight;
+    }
+
+    async function fetchWithTimeout(url, options = {}, timeout = 5000) {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), timeout);
+      
+      try {
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+          credentials: 'include'
+        });
+        clearTimeout(id);
+        return response;
+      } catch (error) {
+        clearTimeout(id);
+        throw error;
+      }
+    }
+
+    // Authentication status functions
+    async function checkAuthStatus() {
+      const statusIndicator = document.getElementById('auth-status-indicator');
+      const statusText = document.getElementById('auth-status-text');
+      const authDetails = document.getElementById('auth-details');
+      const userInfo = document.getElementById('user-info');
+      const sessionInfo = document.getElementById('session-info');
+      
+      try {
+        logToConsole('Checking authentication status...');
+        statusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-400 mr-2';
+        statusText.textContent = 'Checking authentication status...';
+        
+        const response = await fetchWithTimeout('/api/auth/check', {
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        
+        const data = await response.json();
+        logToConsole('Auth check response:', data.isAuthenticated ? 'success' : 'info');
+        logToConsole(data);
+        
+        if (data.isAuthenticated) {
+          statusIndicator.className = 'w-4 h-4 rounded-full bg-green-500 mr-2';
+          statusText.textContent = 'Authenticated';
+          authDetails.classList.remove('hidden');
+          
+          userInfo.textContent = JSON.stringify(data.user, null, 2);
+          
+          // Get detailed session info from auth-debug endpoint
+          try {
+            const debugResponse = await fetchWithTimeout('/api/auth-debug', {
+              headers: { 'Cache-Control': 'no-cache' }
+            });
+            const debugData = await debugResponse.json();
+            sessionInfo.textContent = JSON.stringify(debugData, null, 2);
+            logToConsole('Auth debug data retrieved');
+          } catch (debugError) {
+            sessionInfo.textContent = 'Error fetching session details';
+            logToConsole(`Error fetching auth debug data: ${debugError.message}`, 'error');
+          }
+        } else {
+          statusIndicator.className = 'w-4 h-4 rounded-full bg-red-500 mr-2';
+          statusText.textContent = 'Not authenticated';
+          authDetails.classList.add('hidden');
+        }
+      } catch (error) {
+        statusIndicator.className = 'w-4 h-4 rounded-full bg-red-500 mr-2';
+        statusText.textContent = 'Error checking authentication';
+        authDetails.classList.add('hidden');
+        logToConsole(`Error checking auth status: ${error.message}`, 'error');
+      }
+    }
+
+    async function logout() {
+      try {
+        logToConsole('Attempting to logout...');
+        const response = await fetchWithTimeout('/api/auth/logout', {
+          method: 'POST'
+        });
+        
+        if (response.ok) {
+          logToConsole('Logout successful', 'success');
+          // Refresh auth status
+          checkAuthStatus();
+          // Refresh token display
+          refreshTokenDisplay();
+          // Refresh cookies
+          refreshCookies();
+        } else {
+          logToConsole('Logout failed', 'error');
+        }
+      } catch (error) {
+        logToConsole(`Logout error: ${error.message}`, 'error');
+      }
+    }
+
+    // JWT token functions
+    function parseJwt(token) {
+      try {
+        // Use the jwt-decode library
+        return window.jwt_decode(token);
+      } catch (error) {
+        logToConsole(`Error decoding token: ${error.message}`, 'error');
+        return null;
+      }
+    }
+
+    function isTokenExpired(decodedToken) {
+      if (!decodedToken || !decodedToken.exp) return true;
+      const currentTime = Math.floor(Date.now() / 1000);
+      return decodedToken.exp < currentTime;
+    }
+
+    function getTimeUntilExpiry(decodedToken) {
+      if (!decodedToken || !decodedToken.exp) return 'Unknown';
+      const currentTime = Math.floor(Date.now() / 1000);
+      const timeLeft = decodedToken.exp - currentTime;
+      
+      if (timeLeft <= 0) return 'Expired';
+      
+      // Format time remaining
+      if (timeLeft < 60) return `${timeLeft} seconds`;
+      if (timeLeft < 3600) return `${Math.floor(timeLeft / 60)} minutes`;
+      return `${Math.floor(timeLeft / 3600)} hours, ${Math.floor((timeLeft % 3600) / 60)} minutes`;
+    }
+
+    function refreshTokenDisplay() {
+      const cookies = document.cookie.split(';').reduce((acc, cookie) => {
+        const [name, value] = cookie.trim().split('=');
+        acc[name] = value;
+        return acc;
+      }, {});
+      
+      // Access token
+      const accessTokenContainer = document.getElementById('access-token-container');
+      const accessTokenDecoded = document.getElementById('access-token-decoded');
+      const accessTokenStatus = document.getElementById('access-token-status');
+      
+      // Refresh token
+      const refreshTokenContainer = document.getElementById('refresh-token-container');
+      const refreshTokenDecoded = document.getElementById('refresh-token-decoded');
+      const refreshTokenStatus = document.getElementById('refresh-token-status');
+      
+      // Check for tokens in cookies
+      if (cookies.accessToken) {
+        accessTokenContainer.innerHTML = `<pre>${cookies.accessToken}</pre>`;
+        const decoded = parseJwt(cookies.accessToken);
+        
+        if (decoded) {
+          accessTokenDecoded.innerHTML = `<pre>${JSON.stringify(decoded, null, 2)}</pre>`;
+          
+          if (isTokenExpired(decoded)) {
+            accessTokenStatus.innerHTML = `<div class="test-result-failure p-2">Expired</div>`;
+          } else {
+            accessTokenStatus.innerHTML = `<div class="test-result-success p-2">Valid (expires in ${getTimeUntilExpiry(decoded)})</div>`;
+          }
+        } else {
+          accessTokenDecoded.innerHTML = `<p class="text-red-500">Invalid token format</p>`;
+          accessTokenStatus.innerHTML = `<div class="test-result-failure p-2">Invalid format</div>`;
+        }
+      } else {
+        accessTokenContainer.innerHTML = `<p class="text-gray-500 italic">No access token found</p>`;
+        accessTokenDecoded.innerHTML = `<p class="text-gray-500 italic">No decoded data available</p>`;
+        accessTokenStatus.innerHTML = `<div class="test-result-warning p-2">Missing token</div>`;
+      }
+      
+      if (cookies.refreshToken) {
+        refreshTokenContainer.innerHTML = `<pre>${cookies.refreshToken}</pre>`;
+        const decoded = parseJwt(cookies.refreshToken);
+        
+        if (decoded) {
+          refreshTokenDecoded.innerHTML = `<pre>${JSON.stringify(decoded, null, 2)}</pre>`;
+          
+          if (isTokenExpired(decoded)) {
+            refreshTokenStatus.innerHTML = `<div class="test-result-failure p-2">Expired</div>`;
+          } else {
+            refreshTokenStatus.innerHTML = `<div class="test-result-success p-2">Valid (expires in ${getTimeUntilExpiry(decoded)})</div>`;
+          }
+        } else {
+          refreshTokenDecoded.innerHTML = `<p class="text-red-500">Invalid token format</p>`;
+          refreshTokenStatus.innerHTML = `<div class="test-result-failure p-2">Invalid format</div>`;
+        }
+      } else {
+        refreshTokenContainer.innerHTML = `<p class="text-gray-500 italic">No refresh token found</p>`;
+        refreshTokenDecoded.innerHTML = `<p class="text-gray-500 italic">No decoded data available</p>`;
+        refreshTokenStatus.innerHTML = `<div class="test-result-warning p-2">Missing token</div>`;
+      }
+      
+      logToConsole('Token display refreshed');
+    }
+
+    async function refreshToken() {
+      try {
+        logToConsole('Attempting to refresh token...');
+        const response = await fetchWithTimeout('/api/auth/refresh', {
+          method: 'POST'
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          logToConsole('Token refresh successful', 'success');
+          refreshTokenDisplay();
+          checkAuthStatus();
+        } else {
+          logToConsole(`Token refresh failed: ${response.status}`, 'error');
+        }
+      } catch (error) {
+        logToConsole(`Token refresh error: ${error.message}`, 'error');
+      }
+    }
+
+    // Cookie functions
+    function refreshCookies() {
+      const cookieList = document.getElementById('cookie-list');
+      const cookies = document.cookie.split(';');
+      
+      if (cookies.length === 0 || (cookies.length === 1 && cookies[0].trim() === '')) {
+        cookieList.innerHTML = `<p class="text-gray-500 italic">No cookies found</p>`;
+        return;
+      }
+      
+      let cookieHtml = '<table class="w-full text-sm">';
+      cookieHtml += '<tr class="bg-gray-100"><th class="text-left p-1">Name</th><th class="text-left p-1">Value</th></tr>';
+      
+      cookies.forEach(cookie => {
+        const [name, value] = cookie.trim().split('=');
+        cookieHtml += `
+          <tr>
+            <td class="p-1 border-t">${name}</td>
+            <td class="p-1 border-t">${value ? (value.length > 20 ? value.substring(0, 20) + '...' : value) : ''}</td>
+          </tr>
+        `;
+      });
+      
+      cookieHtml += '</table>';
+      cookieList.innerHTML = cookieHtml;
+      logToConsole('Cookie display refreshed');
+    }
+
+    function clearAllCookies() {
+      const cookies = document.cookie.split(';');
+      
+      cookies.forEach(cookie => {
+        const name = cookie.trim().split('=')[0];
+        document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+        // Also try with different paths
+        document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/api`;
+        document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/api/auth`;
+      });
+      
+      logToConsole('All cookies cleared', 'success');
+      refreshCookies();
+      refreshTokenDisplay();
+      checkAuthStatus();
+    }
+
+    // Endpoint testing functions
+    function setupEndpointTests() {
+      const endpoints = [
+        { url: '/api/auth/check', method: 'GET', description: 'Check authentication status' },
+        { url: '/api/auth/refresh', method: 'POST', description: 'Refresh access token' },
+        { url: '/api/auth/logout', method: 'POST', description: 'Logout user' },
+        { url: '/api/auth/user', method: 'GET', description: 'Get user data' },
+        { url: '/api/user-info', method: 'GET', description: 'Legacy user info endpoint' },
+        { url: '/api/auth-debug', method: 'GET', description: 'Authentication debug info' }
+      ];
+      
+      const tableBody = document.getElementById('endpoint-test-table');
+      tableBody.innerHTML = '';
+      
+      endpoints.forEach((endpoint, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td class="px-6 py-4 whitespace-nowrap">${endpoint.url}</td>
+          <td class="px-6 py-4 whitespace-nowrap">${endpoint.method}</td>
+          <td class="px-6 py-4">${endpoint.description}</td>
+          <td class="px-6 py-4 whitespace-nowrap" id="endpoint-status-${index}">Not tested</td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <button id="test-endpoint-${index}" class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-sm">
+              Test
+            </button>
+          </td>
+        `;
+        tableBody.appendChild(row);
+        
+        // Add event listener to test button
+        document.getElementById(`test-endpoint-${index}`).addEventListener('click', () => {
+          testEndpoint(endpoint, index);
+        });
+      });
+    }
+
+    async function testEndpoint(endpoint, index) {
+      const statusCell = document.getElementById(`endpoint-status-${index}`);
+      statusCell.textContent = 'Testing...';
+      statusCell.className = 'px-6 py-4 whitespace-nowrap text-yellow-500';
+      
+      try {
+        logToConsole(`Testing endpoint: ${endpoint.method} ${endpoint.url}`);
+        
+        const response = await fetchWithTimeout(endpoint.url, {
+          method: endpoint.method,
+          headers: { 'Accept': 'application/json' }
+        });
+        
+        let responseData;
+        try {
+          responseData = await response.json();
+        } catch (e) {
+          responseData = { text: await response.text() };
+        }
+        
+        if (response.ok) {
+          statusCell.textContent = `OK (${response.status})`;
+          statusCell.className = 'px-6 py-4 whitespace-nowrap text-green-500';
+          logToConsole(`Endpoint ${endpoint.url} test successful: ${response.status}`, 'success');
+          logToConsole(responseData);
+        } else {
+          statusCell.textContent = `Error (${response.status})`;
+          statusCell.className = 'px-6 py-4 whitespace-nowrap text-red-500';
+          logToConsole(`Endpoint ${endpoint.url} test failed: ${response.status}`, 'error');
+          logToConsole(responseData);
+        }
+      } catch (error) {
+        statusCell.textContent = `Failed (${error.message})`;
+        statusCell.className = 'px-6 py-4 whitespace-nowrap text-red-500';
+        logToConsole(`Endpoint ${endpoint.url} test error: ${error.message}`, 'error');
+      }
+    }
+
+    async function testAllEndpoints() {
+      const endpoints = document.getElementById('endpoint-test-table').querySelectorAll('tr');
+      
+      logToConsole('Testing all endpoints...');
+      
+      for (let i = 0; i < endpoints.length; i++) {
+        const testButton = endpoints[i].querySelector('button');
+        if (testButton) {
+          testButton.click();
+          // Small delay to prevent overwhelming the server
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+    }
+
+    // Debug console functions
+    function setupConsole() {
+      const input = document.getElementById('console-input');
+      const runButton = document.getElementById('run-command-btn');
+      
+      function executeCommand() {
+        const command = input.value.trim();
+        if (!command) return;
+        
+        logToConsole(`> ${command}`, 'command');
+        
+        try {
+          if (command === 'help()') {
+            logToConsole(`
+Available commands:
+- help() - Show this help
+- checkAuth() - Check authentication status
+- refreshToken() - Refresh the access token
+- clearCookies() - Clear all cookies
+- testEndpoints() - Test all authentication endpoints
+- showTokens() - Display JWT tokens
+- logout() - Log out the current user
+            `);
+          } else if (command === 'checkAuth()') {
+            checkAuthStatus();
+          } else if (command === 'refreshToken()') {
+            refreshToken();
+          } else if (command === 'clearCookies()') {
+            clearAllCookies();
+          } else if (command === 'testEndpoints()') {
+            testAllEndpoints();
+          } else if (command === 'showTokens()') {
+            refreshTokenDisplay();
+          } else if (command === 'logout()') {
+            logout();
+          } else {
+            // Attempt to evaluate JavaScript
+            try {
+              const result = eval(command);
+              logToConsole(result);
+            } catch (evalError) {
+              logToConsole(`Error: ${evalError.message}`, 'error');
+            }
+          }
+        } catch (error) {
+          logToConsole(`Command error: ${error.message}`, 'error');
+        }
+        
+        // Clear input
+        input.value = '';
+      }
+      
+      // Run command on button click
+      runButton.addEventListener('click', executeCommand);
+      
+      // Run command on Enter key
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          executeCommand();
+        }
+      });
+      
+      // Clear console button
+      document.getElementById('clear-console-btn').addEventListener('click', () => {
+        document.getElementById('debug-console').innerHTML = '';
+        logToConsole('Console cleared');
+      });
+    }
+
+    // Initialize everything when DOM is loaded
+    document.addEventListener('DOMContentLoaded', () => {
+      // Setup event listeners
+      document.getElementById('check-auth-btn').addEventListener('click', checkAuthStatus);
+      document.getElementById('logout-btn').addEventListener('click', logout);
+      document.getElementById('clear-cookies-btn').addEventListener('click', clearAllCookies);
+      document.getElementById('refresh-token-btn').addEventListener('click', refreshToken);
+      document.getElementById('go-to-login-btn').addEventListener('click', () => {
+        window.location.href = '/login';
+      });
+      document.getElementById('test-all-endpoints-btn').addEventListener('click', testAllEndpoints);
+      document.getElementById('decode-tokens-btn').addEventListener('click', refreshTokenDisplay);
+      document.getElementById('refresh-cookies-btn').addEventListener('click', refreshCookies);
+      
+      // Initialize components
+      checkAuthStatus();
+      refreshTokenDisplay();
+      refreshCookies();
+      setupEndpointTests();
+      setupConsole();
+      
+      logToConsole('Authentication diagnostics page initialized', 'success');
+    });
+  </script>
+</body>
+</html>

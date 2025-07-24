@@ -1,0 +1,193 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Trial Expired - CollectFlo</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script src="/nav.js"></script>
+</head>
+<body class="bg-gray-50">
+  <div id="nav-placeholder"></div>
+
+  <div class="container mx-auto px-4 py-16">
+    <div class="max-w-4xl mx-auto text-center">
+      <h1 class="text-3xl font-bold mb-6">Your Trial Has Expired</h1>
+      <p class="text-gray-600 mb-12">Continue using CollectFlo by choosing one of our plans below.</p>
+      
+      <div class="grid md:grid-cols-2 gap-8 mb-8">
+        <!-- Monthly Plan -->
+        <div class="bg-white p-8 rounded-lg shadow-lg border-2 border-gray-200">
+          <div class="text-center mb-6">
+            <h3 class="text-2xl font-bold text-gray-900">Monthly Plan</h3>
+            <div class="mt-4">
+              <span class="text-4xl font-bold">$299</span>
+              <span class="text-gray-600">/month</span>
+            </div>
+            <p class="text-gray-500 mt-2">Billed monthly • Cancel anytime</p>
+          </div>
+          
+          <ul class="text-left space-y-3 mb-8">
+            <li class="flex items-center">
+              <svg class="w-5 h-5 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+              </svg>
+              Unlimited invoice follow-ups
+            </li>
+            <li class="flex items-center">
+              <svg class="w-5 h-5 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+              </svg>
+              Email & SMS automation
+            </li>
+            <li class="flex items-center">
+              <svg class="w-5 h-5 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+              </svg>
+              QuickBooks integration
+            </li>
+            <li class="flex items-center">
+              <svg class="w-5 h-5 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+              </svg>
+              Priority support
+            </li>
+          </ul>
+          
+          <button onclick="selectPlan('standard')" class="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 font-semibold">
+            Choose Monthly Plan
+          </button>
+        </div>
+
+        <!-- Annual Plan -->
+        <div class="bg-white p-8 rounded-lg shadow-lg border-2 border-indigo-500 relative">
+          <div class="absolute -top-3 left-1/2 transform -translate-x-1/2">
+            <span class="bg-indigo-500 text-white px-4 py-1 rounded-full text-sm font-semibold">50% SAVINGS</span>
+          </div>
+          
+          <div class="text-center mb-6">
+            <h3 class="text-2xl font-bold text-gray-900">Annual Plan</h3>
+            <div class="mt-4">
+              <span class="text-4xl font-bold">$1,800</span>
+              <span class="text-gray-600">/year</span>
+            </div>
+            <p class="text-gray-500 mt-2">Billed annually • Save $1,788/year</p>
+            <p class="text-sm text-indigo-600 font-semibold">Equivalent to $150/month</p>
+          </div>
+          
+          <ul class="text-left space-y-3 mb-8">
+            <li class="flex items-center">
+              <svg class="w-5 h-5 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+              </svg>
+              Everything in Monthly Plan
+            </li>
+            <li class="flex items-center">
+              <svg class="w-5 h-5 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+              </svg>
+              <span class="font-semibold text-indigo-600">50% annual savings</span>
+            </li>
+            <li class="flex items-center">
+              <svg class="w-5 h-5 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+              </svg>
+              Priority feature requests
+            </li>
+          </ul>
+          
+          <button onclick="selectPlan('premium')" class="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 font-semibold">
+            Choose Annual Plan
+          </button>
+        </div>
+      </div>
+
+      <!-- Payment Form (hidden initially) -->
+      <div id="payment-section" class="hidden max-w-md mx-auto">
+        <div class="bg-white p-8 rounded-lg shadow mb-8">
+          <h3 id="selected-plan-title" class="text-xl font-bold mb-4 text-center"></h3>
+          <form id="payment-form" class="space-y-6">
+            <div id="card-element" class="p-4 border rounded"></div>
+            <div id="card-errors" class="text-red-600"></div>
+            <button type="submit" id="submit-button" class="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700">
+              Complete Subscription
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://js.stripe.com/v3/"></script>
+  <script>
+    let selectedPlan = null;
+    let stripe = null;
+    let elements = null;
+    let card = null;
+
+    function selectPlan(plan) {
+      selectedPlan = plan;
+      
+      // Initialize Stripe if not already done
+      if (!stripe) {
+        stripe = Stripe('pk_test_51234567890'); // You'll need to replace with your actual publishable key
+        elements = stripe.elements();
+        card = elements.create('card');
+        card.mount('#card-element');
+      }
+      
+      // Show payment section
+      document.getElementById('payment-section').classList.remove('hidden');
+      
+      // Update title based on selected plan
+      const title = plan === 'standard' ? 'Monthly Plan - $299/month' : 'Annual Plan - $1,800/year (50% savings)';
+      document.getElementById('selected-plan-title').textContent = title;
+      
+      // Scroll to payment section
+      document.getElementById('payment-section').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // Handle form submission
+    document.addEventListener('DOMContentLoaded', function() {
+      document.getElementById('payment-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        
+        if (!selectedPlan) {
+          alert('Please select a plan first');
+          return;
+        }
+        
+        const {token, error} = await stripe.createToken(card);
+        
+        if (error) {
+          document.getElementById('card-errors').textContent = error.message;
+        } else {
+          try {
+            const response = await fetch('/create-subscription', {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'x-replit-user-id': window.location.hostname.includes('replit') ? 'demo-user' : ''
+              },
+              body: JSON.stringify({ 
+                plan: selectedPlan,
+                token: token.id 
+              })
+            });
+            
+            const result = await response.json();
+            
+            if (result.id) {
+              // Redirect to Stripe Checkout
+              stripe.redirectToCheckout({ sessionId: result.id });
+            } else {
+              document.getElementById('card-errors').textContent = 'Payment failed. Please try again.';
+            }
+          } catch (err) {
+            document.getElementById('card-errors').textContent = 'Payment failed. Please try again.';
+          }
+        }
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Log In - CollectFlo</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script src="/nav.js"></script>
+</head>
+<body class="bg-gray-50">
+  <div id="nav-placeholder"></div>
+
+  <div class="container mx-auto px-4 py-16">
+    <div class="max-w-md mx-auto">
+      <h1 class="text-3xl font-bold mb-6 text-center">Log In to CollectFlo</h1>
+      <p class="text-gray-600 mb-8 text-center">Access your account to manage your collections</p>
+      
+      <!-- Error message container -->
+      <div id="error-container" class="mb-6 hidden">
+        <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+          <div class="flex">
+            <svg class="w-5 h-5 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+            </svg>
+            <div>
+              <p class="font-medium" id="error-title">Error</p>
+              <p class="text-sm" id="error-message"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <form id="login-form" class="space-y-6 bg-white p-8 rounded-lg shadow">
+        <div>
+          <label class="block text-sm font-medium mb-1">Email Address</label>
+          <input type="email" id="email" required class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Password</label>
+          <input type="password" id="password" required class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+          <div class="flex justify-end mt-1">
+            <a href="/forgot-password" class="text-xs text-indigo-600 hover:text-indigo-800">Forgot password?</a>
+          </div>
+        </div>
+        <button type="submit" id="submit-button" class="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 flex items-center justify-center">
+          <svg id="spinner" class="hidden animate-spin h-5 w-5 mr-2 text-white"
+               xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor"
+                  d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z"></path>
+          </svg>
+          <span id="submit-label">Log In</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="text-center mt-6">
+    <p class="text-gray-600">Don't have an account? 
+      <a href="/signup" class="text-indigo-600 hover:text-indigo-800">Sign up</a>
+    </p>
+  </div>
+
+  <!-- Debug console + toggle -->
+  <div class="fixed bottom-4 right-4 text-xs">
+    <label class="inline-flex items-center space-x-1 cursor-pointer select-none bg-gray-200 px-2 py-1 rounded">
+      <input type="checkbox" id="debug-toggle" class="form-checkbox">
+      <span>Debug&nbsp;Mode</span>
+    </label>
+  </div>
+  <pre id="debug-log" class="hidden fixed bottom-10 right-4 w-96 h-48 bg-black text-green-200 p-2 rounded overflow-auto text-xs"></pre>
+
+  <script>
+    /* -------------------- debug helpers ---------------------------- */
+    function dlog(...args) {
+      if (!document.getElementById('debug-toggle').checked) return;
+      console.log('[login]', ...args);
+      const pre = document.getElementById('debug-log');
+      pre.classList.remove('hidden');
+      pre.textContent += args.map(a => (typeof a === 'object' ? JSON.stringify(a, null, 2) : a)).join(' ') + '\n';
+      pre.scrollTop = pre.scrollHeight;
+    }
+
+    // Get redirect URL from query parameters if present
+    let redirectUrl = '/dashboard'; // Default redirect
+    
+    function getRedirectUrl() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const redirect = urlParams.get('redirect');
+      return redirect ? decodeURIComponent(redirect) : '/dashboard';
+    }
+    
+    // Set redirect URL when page loads
+   document.addEventListener('DOMContentLoaded', function() {
+  redirectUrl = getRedirectUrl();
+  
+  // Add form event listener (CSP-compliant)
+  const loginForm = document.getElementById('login-form');
+  loginForm.addEventListener('submit', handleLogin);
+});
+    
+    function showError(title, message) {
+      const container = document.getElementById('error-container');
+      const titleElement = document.getElementById('error-title');
+      const messageElement = document.getElementById('error-message');
+      
+      titleElement.textContent = title;
+      messageElement.textContent = message;
+      container.classList.remove('hidden');
+      
+      // Scroll to error
+      container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    
+    function hideError() {
+      document.getElementById('error-container').classList.add('hidden');
+    }
+    
+    function validateForm() {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      
+      // Reset any previous errors
+      hideError();
+      
+      // Validate email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        showError('Invalid Email', 'Please enter a valid email address.');
+        return false;
+      }
+      
+      // Basic password validation
+      if (password.length === 0) {
+        showError('Invalid Password', 'Please enter your password.');
+        return false;
+      }
+
+      // password length min?
+      if (password.length < 8) {
+        showError('Invalid Password', 'Password must be at least 8 characters long.');
+        return false;
+      }
+      
+      return true;
+    }
+
+    /* ------------- generic fetch with retry & credentials ---------- */
+    async function fetchWithRetry(url, options = {}, attempts = 3, delay = 300) {
+      for (let i = 0; i < attempts; i++) {
+        try {
+          return await fetch(url, { credentials: 'include', ...options });
+        } catch (err) {
+          if (i === attempts - 1) throw err;
+          await new Promise(r => setTimeout(r, delay * (i + 1)));
+        }
+      }
+    }
+
+    async function handleLogin(event) {
+      event.preventDefault();
+      
+      // Debug: verify handler executed
+      dlog('handleLogin called');
+
+      // Validate form
+      if (!validateForm()) {
+        dlog('form validation failed');
+        return;
+      }
+      
+      // Show loading state
+      const submitButton = document.getElementById('submit-button');
+      const spinner = document.getElementById('spinner');
+      const label = document.getElementById('submit-label');
+      const originalText = submitButton.innerText;
+      submitButton.disabled = true;
+      label.textContent = 'Logging In…';
+      spinner.classList.remove('hidden');
+      
+      const formData = {
+        email: document.getElementById('email').value.trim(),
+        password: document.getElementById('password').value,
+        redirect: redirectUrl
+      };
+      
+      try {
+        dlog('submitting', formData);
+
+        const response = await fetchWithRetry('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        });
+        
+        const result = await response.json().catch(() => ({}));
+
+        dlog('response status', response.status, result);
+
+        // Successful HTTP **and** backend indicated success
+        if (response.ok && result.success) {
+          // Extra check that session is active
+          try {
+            const verify = await fetchWithRetry('/api/auth/check', { headers:{'Cache-Control':'no-cache'} });
+            dlog('session verify', verify.status);
+          } catch(e){ dlog('session verify failed', e);}
+          // Redirect to dashboard or specified redirect URL
+          window.location.href = result.redirect || redirectUrl;
+        } else if (response.status === 401) {
+          // Invalid credentials
+          showError('Login Failed', 'Invalid email or password. Please try again.');
+        } else if (response.status === 400 && result.errors?.length) {
+          // Validation errors from server
+          showError('Login Failed', result.errors[0].msg || 'Validation error. Please try again.');
+        } else {
+          // Generic or auth failure
+          showError(
+            'Login Failed',
+            result.message || 'Invalid email or password. Please try again.'
+          );
+        }
+      } catch (error) {
+        console.error('Login error:', error);
+        showError('Connection Error', 'Unable to connect to the server. Please check your internet connection and try again.');
+      } finally {
+        // Reset button state
+        submitButton.disabled = false;
+        label.textContent = 'Log In';
+        spinner.classList.add('hidden');
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CollectFlo Authentication Diagnostic Tool</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f9fafb;
+    }
+    
+    h1, h2, h3 {
+      color: #2563eb;
+    }
+    
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .status-indicator {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+    
+    .status-authenticated { background-color: #10b981; }
+    .status-unauthenticated { background-color: #ef4444; }
+    .status-unknown { background-color: #f59e0b; }
+    
+    .auth-status {
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+    }
+    
+    .panel {
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+    }
+    
+    .form-group {
+      margin-bottom: 15px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+    
+    input[type="email"],
+    input[type="password"],
+    input[type="text"] {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      font-size: 16px;
+    }
+    
+    button {
+      background-color: #2563eb;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    
+    button:hover {
+      background-color: #1d4ed8;
+    }
+    
+    button.secondary {
+      background-color: #6b7280;
+    }
+    
+    button.secondary:hover {
+      background-color: #4b5563;
+    }
+    
+    button.danger {
+      background-color: #ef4444;
+    }
+    
+    button.danger:hover {
+      background-color: #dc2626;
+    }
+    
+    .button-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 15px;
+    }
+    
+    pre {
+      background-color: #1e293b;
+      color: #e2e8f0;
+      padding: 15px;
+      border-radius: 4px;
+      overflow: auto;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 14px;
+      max-height: 300px;
+    }
+    
+    .cookie-item {
+      background-color: #f3f4f6;
+      padding: 8px 12px;
+      border-radius: 4px;
+      margin-bottom: 8px;
+      font-family: 'Courier New', Courier, monospace;
+      word-break: break-all;
+    }
+    
+    .cookie-name {
+      font-weight: bold;
+      color: #2563eb;
+    }
+    
+    .tab-container {
+      border-bottom: 1px solid #e5e7eb;
+      margin-bottom: 20px;
+    }
+    
+    .tab-button {
+      background: none;
+      border: none;
+      padding: 10px 15px;
+      cursor: pointer;
+      font-size: 16px;
+      color: #6b7280;
+      border-bottom: 2px solid transparent;
+    }
+    
+    .tab-button.active {
+      color: #2563eb;
+      border-bottom: 2px solid #2563eb;
+    }
+    
+    .tab-content {
+      display: none;
+    }
+    
+    .tab-content.active {
+      display: block;
+    }
+    
+    .endpoint-test {
+      margin-bottom: 15px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .endpoint-url {
+      font-family: 'Courier New', Courier, monospace;
+      color: #2563eb;
+      margin-bottom: 5px;
+    }
+    
+    .response-status {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: bold;
+      margin-right: 8px;
+    }
+    
+    .status-200 { background-color: #d1fae5; color: #065f46; }
+    .status-401 { background-color: #fee2e2; color: #b91c1c; }
+    .status-404 { background-color: #fef3c7; color: #92400e; }
+    .status-500 { background-color: #fee2e2; color: #b91c1c; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>CollectFlo Authentication Diagnostic Tool</h1>
+    <div class="auth-status">
+      <span class="status-indicator status-unknown" id="main-status-indicator"></span>
+      <span id="main-status-text">Checking authentication...</span>
+    </div>
+  </div>
+  
+  <div class="tab-container">
+    <button class="tab-button active" data-tab="overview">Overview</button>
+    <button class="tab-button" data-tab="login-test">Login Test</button>
+    <button class="tab-button" data-tab="endpoints">API Endpoints</button>
+    <button class="tab-button" data-tab="cookies">Cookies</button>
+    <button class="tab-button" data-tab="cors">CORS & Headers</button>
+    <button class="tab-button" data-tab="advanced">Advanced Tests</button>
+  </div>
+  
+  <div id="overview" class="tab-content active">
+    <div class="panel">
+      <h2>Authentication Status</h2>
+      <p>This tool helps diagnose authentication issues with the CollectFlo platform.</p>
+      <div id="auth-summary">Loading authentication status...</div>
+      <div class="button-group">
+        <button onclick="checkAllEndpoints()">Check All Endpoints</button>
+        <button onclick="refreshCookies()">Refresh Cookies</button>
+        <button class="danger" onclick="clearAllCookies()">Clear All Cookies</button>
+      </div>
+    </div>
+    
+    <div class="grid">
+      <div class="panel">
+        <h3>Session Info</h3>
+        <div id="session-info">Loading session information...</div>
+      </div>
+      
+      <div class="panel">
+        <h3>Quick Login</h3>
+        <form id="quick-login-form">
+          <div class="form-group">
+            <label for="quick-email">Email</label>
+            <input type="email" id="quick-email" required placeholder="your@email.com">
+          </div>
+          <div class="form-group">
+            <label for="quick-password">Password</label>
+            <input type="password" id="quick-password" required placeholder="Your password">
+          </div>
+          <button type="submit">Log In</button>
+          <button type="button" class="secondary" onclick="logoutUser()">Log Out</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  
+  <div id="login-test" class="tab-content">
+    <div class="panel">
+      <h2>Login Form Test</h2>
+      <p>Test the login process with detailed response information.</p>
+      
+      <form id="detailed-login-form">
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" required placeholder="your@email.com">
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" required placeholder="Your password">
+        </div>
+        <div class="form-group">
+          <label for="redirect">Redirect URL (optional)</label>
+          <input type="text" id="redirect" placeholder="/dashboard">
+        </div>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="include-credentials"> Include credentials
+          </label>
+        </div>
+        <button type="submit">Log In</button>
+      </form>
+      
+      <div class="endpoint-test">
+        <h3>Request Details</h3>
+        <pre id="login-request-details">No request sent yet</pre>
+      </div>
+      
+      <div class="endpoint-test">
+        <h3>Response</h3>
+        <div id="login-response-status"></div>
+        <h4>Headers</h4>
+        <pre id="login-response-headers">No response yet</pre>
+        <h4>Body</h4>
+        <pre id="login-response-body">No response yet</pre>
+      </div>
+    </div>
+  </div>
+  
+  <div id="endpoints" class="tab-content">
+    <div class="panel">
+      <h2>API Endpoint Tests</h2>
+      <p>Test various authentication-related endpoints to diagnose issues.</p>
+      
+      <div id="endpoint-tests">
+        <div class="endpoint-test">
+          <h3>Check Authentication Status</h3>
+          <div class="endpoint-url">/api/check-auth</div>
+          <button onclick="testEndpoint('/api/check-auth', 'check-auth')">Test Endpoint</button>
+          <div id="check-auth-status"></div>
+          <pre id="check-auth-response">No response yet</pre>
+        </div>
+        
+        <div class="endpoint-test">
+          <h3>User Info</h3>
+          <div class="endpoint-url">/api/user-info</div>
+          <button onclick="testEndpoint('/api/user-info', 'user-info')">Test Endpoint</button>
+          <div id="user-info-status"></div>
+          <pre id="user-info-response">No response yet</pre>
+        </div>
+        
+        <div class="endpoint-test">
+          <h3>Dashboard Stats (Authenticated Only)</h3>
+          <div class="endpoint-url">/api/dashboard/stats</div>
+          <button onclick="testEndpoint('/api/dashboard/stats', 'dashboard-stats')">Test Endpoint</button>
+          <div id="dashboard-stats-status"></div>
+          <pre id="dashboard-stats-response">No response yet</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div id="cookies" class="tab-content">
+    <div class="panel">
+      <h2>Cookie Inspection</h2>
+      <p>View all cookies currently set in your browser for this domain.</p>
+      
+      <div class="button-group">
+        <button onclick="refreshCookies()">Refresh Cookies</button>
+        <button class="danger" onclick="clearAllCookies()">Clear All Cookies</button>
+      </div>
+      
+      <div id="cookie-list">Loading cookies...</div>
+      
+      <h3>Cookie Analysis</h3>
+      <div id="cookie-analysis">No cookies analyzed yet</div>
+    </div>
+  </div>
+  
+  <div id="cors" class="tab-content">
+    <div class="panel">
+      <h2>CORS & Headers</h2>
+      <p>Analyze CORS settings and response headers that might affect authentication.</p>
+      
+      <div class="endpoint-test">
+        <h3>CORS Pre-flight Test (OPTIONS)</h3>
+        <button onclick="testCorsOptions('/api/check-auth')">Test CORS Pre-flight</button>
+        <pre id="cors-options-response">No response yet</pre>
+      </div>
+      
+      <div class="endpoint-test">
+        <h3>Set-Cookie Headers Analysis</h3>
+        <button onclick="analyzeSetCookieHeaders()">Analyze Set-Cookie Headers</button>
+        <pre id="cookie-headers-analysis">No analysis yet</pre>
+      </div>
+    </div>
+  </div>
+  
+  <div id="advanced" class="tab-content">
+    <div class="panel">
+      <h2>Advanced Tests</h2>
+      <p>Advanced diagnostic tools for troubleshooting authentication issues.</p>
+      
+      <div class="grid">
+        <div>
+          <h3>Session Tests</h3>
+          <div class="button-group">
+            <button onclick="testSessionPersistence()">Test Session Persistence</button>
+            <button onclick="checkSessionTimeout()">Check Session Timeout</button>
+            <button class="danger" onclick="invalidateSession()">Invalidate Session</button>
+          </div>
+          <pre id="session-test-results">No tests run yet</pre>
+        </div>
+        
+        <div>
+          <h3>Cookie Manipulation</h3>
+          <div class="form-group">
+            <label for="cookie-name">Cookie Name</label>
+            <input type="text" id="cookie-name" placeholder="connect.sid">
+          </div>
+          <div class="form-group">
+            <label for="cookie-value">Cookie Value</label>
+            <input type="text" id="cookie-value" placeholder="s%3A...">
+          </div>
+          <div class="button-group">
+            <button onclick="setCookie()">Set Cookie</button>
+            <button onclick="deleteCookie()">Delete Cookie</button>
+          </div>
+        </div>
+      </div>
+      
+      <h3>Request with Custom Headers</h3>
+      <div class="form-group">
+        <label for="custom-url">URL</label>
+        <input type="text" id="custom-url" value="/api/check-auth">
+      </div>
+      <div class="form-group">
+        <label for="custom-headers">Headers (JSON)</label>
+        <input type="text" id="custom-headers" value='{"Cache-Control": "no-cache"}'>
+      </div>
+      <button onclick="sendCustomRequest()">Send Request</button>
+      <pre id="custom-request-response">No response yet</pre>
+    </div>
+  </div>
+  
+  <script>
+    // Global state
+    let authState = {
+      isAuthenticated: false,
+      user: null,
+      sessionId: null,
+      lastChecked: null
+    };
+    
+    // Initialize the page
+    document.addEventListener('DOMContentLoaded', function() {
+      setupTabs();
+      checkAuthStatus();
+      refreshCookies();
+      setupForms();
+    });
+    
+    // Tab functionality
+    function setupTabs() {
+      const tabButtons = document.querySelectorAll('.tab-button');
+      
+      tabButtons.forEach(button => {
+        button.addEventListener('click', function() {
+          // Remove active class from all tabs
+          tabButtons.forEach(btn => btn.classList.remove('active'));
+          document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+          
+          // Add active class to clicked tab
+          button.classList.add('active');
+          const tabId = button.getAttribute('data-tab');
+          document.getElementById(tabId).classList.add('active');
+        });
+      });
+    }
+    
+    // Setup form submissions
+    function setupForms() {
+      // Quick login form
+      document.getElementById('quick-login-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const email = document.getElementById('quick-email').value;
+        const password = document.getElementById('quick-password').value;
+        loginUser(email, password);
+      });
+      
+      // Detailed login form
+      document.getElementById('detailed-login-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const redirect = document.getElementById('redirect').value || '/dashboard';
+        const includeCredentials = document.getElementById('include-credentials').checked;
+        
+        loginUserDetailed(email, password, redirect, includeCredentials);
+      });
+    }
+    
+    // Authentication status check
+    async function checkAuthStatus() {
+      try {
+        const response = await fetch('/api/check-auth', {
+          credentials: 'include',
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.isAuthenticated) {
+          authState.isAuthenticated = true;
+          authState.user = data.user;
+          authState.lastChecked = new Date();
+          
+          updateAuthStatusUI(true);
+          updateSessionInfo(data.user);
+        } else {
+          authState.isAuthenticated = false;
+          authState.user = null;
+          authState.lastChecked = new Date();
+          
+          updateAuthStatusUI(false);
+          updateSessionInfo(null);
+        }
+      } catch (error) {
+        console.error('Error checking auth status:', error);
+        authState.isAuthenticated = false;
+        authState.lastChecked = new Date();
+        
+        updateAuthStatusUI(null, error);
+        updateSessionInfo(null, error);
+      }
+    }
+    
+    // Update authentication status UI
+    function updateAuthStatusUI(isAuthenticated, error = null) {
+      const indicator = document.getElementById('main-status-indicator');
+      const text = document.getElementById('main-status-text');
+      const summary = document.getElementById('auth-summary');
+      
+      if (error) {
+        indicator.className = 'status-indicator status-unknown';
+        text.textContent = 'Error checking authentication';
+        summary.innerHTML = `
+          <div class="cookie-item">
+            <strong style="color: #ef4444;">Error checking authentication:</strong>
+            <p>${error.message || 'Unknown error'}</p>
+          </div>
+        `;
+        return;
+      }
+      
+      if (isAuthenticated) {
+        indicator.className = 'status-indicator status-authenticated';
+        text.textContent = 'Authenticated';
+        summary.innerHTML = `
+          <div class="cookie-item">
+            <strong style="color: #10b981;">✓ You are authenticated</strong>
+            <p>Session is active and valid.</p>
+          </div>
+        `;
+      } else {
+        indicator.className = 'status-indicator status-unauthenticated';
+        text.textContent = 'Not Authenticated';
+        summary.innerHTML = `
+          <div class="cookie-item">
+            <strong style="color: #ef4444;">✗ You are not authenticated</strong>
+            <p>No active session found. Try logging in.</p>
+          </div>
+        `;
+      }
+    }
+    
+    // Update session info
+    function updateSessionInfo(user, error = null) {
+      const sessionInfo = document.getElementById('session-info');
+      
+      if (error) {
+        sessionInfo.innerHTML = `
+          <div class="cookie-item">
+            <strong style="color: #ef4444;">Error retrieving session:</strong>
+            <p>${error.message || 'Unknown error'}</p>
+          </div>
+        `;
+        return;
+      }
+      
+      if (user) {
+        sessionInfo.innerHTML = `
+          <div class="cookie-item">
+            <strong>User ID:</strong> ${user.id}
+          </div>
+          <div class="cookie-item">
+            <strong>Email:</strong> ${user.email}
+          </div>
+          <div class="cookie-item">
+            <strong>Name:</strong> ${user.name || 'N/A'}
+          </div>
+          <div class="cookie-item">
+            <strong>Role:</strong> ${user.role || 'N/A'}
+          </div>
+          <div class="cookie-item">
+            <strong>Last Checked:</strong> ${authState.lastChecked.toLocaleTimeString()}
+          </div>
+        `;
+      } else {
+        sessionInfo.innerHTML = `
+          <div class="cookie-item">
+            <strong>No active session</strong>
+            <p>You are not currently logged in.</p>
+          </div>
+          <div class="cookie-item">
+            <strong>Last Checked:</strong> ${authState.lastChecked ? authState.lastChecked.toLocaleTimeString() : 'Never'}
+          </div>
+        `;
+      }
+    }
+    
+    // Login user (quick version)
+    async function loginUser(email, password) {
+      try {
+        const response = await fetch('/api/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include',
+          body: JSON.stringify({ email, password })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+          alert('Login successful!');
+          checkAuthStatus();
+          refreshCookies();
+        } else {
+          alert(`Login failed: ${data.message || 'Unknown error'}`);
+        }
+      } catch (error) {
+        console.error('Login error:', error);
+        alert(`Login error: ${error.message}`);
+      }
+    }
+    
+    // Login user (detailed version)
+    async function loginUserDetailed(email, password, redirect, includeCredentials) {
+      const requestDetails = document.getElementById('login-request-details');
+      const responseStatus = document.getElementById('login-response-status');
+      const responseHeaders = document.getElementById('login-response-headers');
+      const responseBody = document.getElementById('login-response-body');
+      
+      const requestBody = {
+        email,
+        password,
+        redirect
+      };
+      
+      requestDetails.textContent = JSON.stringify(requestBody, null, 2);
+      
+      try {
+        const response = await fetch('/api/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          credentials: includeCredentials ? 'include' : 'omit',
+          body: JSON.stringify(requestBody)
+        });
+        
+        // Display response status
+        const statusClass = `status-${response.status}`;
+        responseStatus.innerHTML = `
+          <span class="response-status ${statusClass}">Status: ${response.status} ${response.statusText}</span>
+        `;
+        
+        // Display response headers
+        const headers = {};
+        response.headers.forEach((value, key) => {
+          headers[key] = value;
+        });
+        responseHeaders.textContent = JSON.stringify(headers, null, 2);
+        
+        // Display response body
+        try {
+          const data = await response.json();
+          responseBody.textContent = JSON.stringify(data, null, 2);
+          
+          if (response.ok && data.success) {
+            // Update auth status after successful login
+            setTimeout(() => {
+              checkAuthStatus();
+              refreshCookies();
+            }, 500);
+          }
+        } catch (e) {
+          responseBody.textContent = 'Error parsing JSON response: ' + e.message;
+        }
+      } catch (error) {
+        console.error('Login error:', error);
+        responseStatus.innerHTML = `
+          <span class="response-status status-500">Error: ${error.message}</span>
+        `;
+        responseHeaders.textContent = 'N/A';
+        responseBody.textContent = error.stack || error.message;
+      }
+    }
+    
+    // Logout user
+    async function logoutUser() {
+      try {
+        const response = await fetch('/api/logout', {
+          method: 'POST',
+          credentials: 'include'
+        });
+        
+        if (response.ok) {
+          alert('Logout successful!');
+        } else {
+          alert('Logout failed!');
+        }
+        
+        checkAuthStatus();
+        refreshCookies();
+      } catch (error) {
+        console.error('Logout error:', error);
+        alert(`Logout error: ${error.message}`);
+      }
+    }
+    
+    // Test specific endpoint
+    async function testEndpoint(url, elementPrefix) {
+      const statusElement = document.getElementById(`${elementPrefix}-status`);
+      const responseElement = document.getElementById(`${elementPrefix}-response`);
+      
+      statusElement.innerHTML = 'Testing...';
+      
+      try {
+        const response = await fetch(url, {
+          credentials: 'include',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Accept': 'application/json'
+          }
+        });
+        
+        const statusClass = `status-${response.status}`;
+        statusElement.innerHTML = `
+          <span class="response-status ${statusClass}">Status: ${response.status} ${response.statusText}</span>
+        `;
+        
+        try {
+          const data = await response.json();
+          responseElement.textContent = JSON.stringify(data, null, 2);
+        } catch (e) {
+          responseElement.textContent = 'Error parsing JSON response';
+        }
+      } catch (error) {
+        console.error(`Error testing ${url}:`, error);
+        statusElement.innerHTML = `
+          <span class="response-status status-500">Error: ${error.message}</span>
+        `;
+        responseElement.textContent = error.stack || error.message;
+      }
+    }
+    
+    // Test all endpoints
+    function checkAllEndpoints() {
+      testEndpoint('/api/check-auth', 'check-auth');
+      testEndpoint('/api/user-info', 'user-info');
+      testEndpoint('/api/dashboard/stats', 'dashboard-stats');
+    }
+    
+    // Refresh cookies display
+    function refreshCookies() {
+      const cookieList = document.getElementById('cookie-list');
+      const cookieAnalysis = document.getElementById('cookie-analysis');
+      
+      const cookies = document.cookie.split(';').map(cookie => cookie.trim());
+      
+      if (cookies.length === 0 || (cookies.length === 1 && cookies[0] === '')) {
+        cookieList.innerHTML = '<p>No cookies found for this domain.</p>';
+        cookieAnalysis.innerHTML = '<p>No cookies to analyze.</p>';
+        return;
+      }
+      
+      let cookieHtml = '';
+      let sessionCookie = null;
+      
+      cookies.forEach(cookie => {
+        const [name, value] = cookie.split('=').map(part => part.trim());
+        
+        cookieHtml += `
+          <div class="cookie-item">
+            <span class="cookie-name">${name}:</span> ${value}
+          </div>
+        `;
+        
+        if (name === 'connect.sid') {
+          sessionCookie = value;
+        }
+      });
+      
+      cookieList.innerHTML = cookieHtml;
+      
+      // Analyze cookies
+      let analysisHtml = '';
+      
+      if (sessionCookie) {
+        analysisHtml += `
+          <div class="cookie-item">
+            <strong>Session cookie found:</strong> connect.sid
+            <p>This is the standard Express session cookie.</p>
+          </div>
+        `;
+      } else {
+        analysisHtml += `
+          <div class="cookie-item">
+            <strong style="color: #ef4444;">No session cookie found</strong>
+            <p>The Express session cookie (connect.sid) is missing. This may indicate a problem with session creation or cookie storage.</p>
+          </div>
+        `;
+      }
+      
+      cookieAnalysis.innerHTML = analysisHtml;
+    }
+    
+    // Clear all cookies
+    function clearAllCookies() {
+      const cookies = document.cookie.split(';');
+      
+      cookies.forEach(cookie => {
+        const name = cookie.split('=')[0].trim();
+        document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+      });
+      
+      alert('All cookies cleared!');
+      refreshCookies();
+      checkAuthStatus();
+    }
+    
+    // Test CORS OPTIONS request
+    async function testCorsOptions(url) {
+      const responseElement = document.getElementById('cors-options-response');
+      
+      responseElement.textContent = 'Testing CORS pre-flight...';
+      
+      try {
+        // Create a custom OPTIONS request
+        const response = await fetch(url, {
+          method: 'OPTIONS',
+          headers: {
+            'Origin': window.location.origin,
+            'Access-Control-Request-Method': 'GET',
+            'Access-Control-Request-Headers': 'Content-Type'
+          }
+        });
+        
+        const headers = {};
+        response.headers.forEach((value, key) => {
+          headers[key] = value;
+        });
+        
+        const result = {
+          status: response.status,
+          statusText: response.statusText,
+          headers: headers
+        };
+        
+        responseElement.textContent = JSON.stringify(result, null, 2);
+        
+        // Analyze CORS headers
+        let corsAnalysis = '';
+        
+        if (headers['access-control-allow-origin']) {
+          corsAnalysis += `\n\nCORS Analysis:
+- Access-Control-Allow-Origin: ${headers['access-control-allow-origin']}
+- Access-Control-Allow-Credentials: ${headers['access-control-allow-credentials'] || 'Not set'}
+- Access-Control-Allow-Methods: ${headers['access-control-allow-methods'] || 'Not set'}
+- Access-Control-Allow-Headers: ${headers['access-control-allow-headers'] || 'Not set'}`;
+          
+          if (headers['access-control-allow-credentials'] !== 'true') {
+            corsAnalysis += '\n\nWarning: Credentials not allowed in CORS. This may prevent cookies from being sent cross-origin.';
+          }
+        } else {
+          corsAnalysis += '\n\nWarning: No CORS headers found. This server may not support CORS.';
+        }
+        
+        responseElement.textContent += corsAnalysis;
+      } catch (error) {
+        console.error('CORS test error:', error);
+        responseElement.textContent = `Error: ${error.message}\n${error.stack}`;
+      }
+    }
+    
+    // Analyze Set-Cookie headers
+    async function analyzeSetCookieHeaders() {
+      const analysisElement = document.getElementById('cookie-headers-analysis');
+      
+      analysisElement.textContent = 'Analyzing Set-Cookie headers...';
+      
+      try {
+        // Make a login request to trigger Set-Cookie headers
+        const response = await fetch('/api/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            email: 'test@example.com',
+            password: 'password123'
+          })
+        });
+        
+        // Get the Set-Cookie headers
+        const setCookieHeader = response.headers.get('set-cookie');
+        
+        if (!setCookieHeader) {
+          analysisElement.textContent = 'No Set-Cookie headers found in the response.';
+          return;
+        }
+        
+        // Parse and analyze the Set-Cookie headers
+        const analysis = {
+          raw: setCookieHeader,
+          parsed: parseCookieHeader(setCookieHeader),
+          issues: []
+        };
+        
+        // Check for potential issues
+        if (!setCookieHeader.includes('HttpOnly')) {
+          analysis.issues.push('Cookie is not HttpOnly. This makes it accessible to JavaScript, which is a security risk.');
+        }
+        
+        if (!setCookieHeader.includes('Secure')) {
+          analysis.issues.push('Cookie is not marked as Secure. This allows it to be sent over non-HTTPS connections.');
+        }
+        
+        if (!setCookieHeader.includes('SameSite')) {
+          analysis.issues.push('No SameSite attribute specified. This may cause issues with cross-site requests.');
+        } else if (setCookieHeader.includes('SameSite=None') && !setCookieHeader.includes('Secure')) {
+          analysis.issues.push('SameSite=None requires the Secure attribute.');
+        }
+        
+        analysisElement.textContent = JSON.stringify(analysis, null, 2);
+      } catch (error) {
+        console.error('Set-Cookie analysis error:', error);
+        analysisElement.textContent = `Error: ${error.message}\n${error.stack}`;
+      }
+    }
+    
+    // Parse Set-Cookie header
+    function parseCookieHeader(header) {
+      if (!header) return null;
+      
+      const parts = header.split(';').map(part => part.trim());
+      const nameValue = parts[0].split('=');
+      
+      const parsed = {
+        name: nameValue[0],
+        value: nameValue.slice(1).join('='),
+        attributes: {}
+      };
+      
+      parts.slice(1).forEach(part => {
+        if (part.includes('=')) {
+          const [name, value] = part.split('=');
+          parsed.attributes[name] = value;
+        } else {
+          parsed.attributes[part] = true;
+        }
+      });
+      
+      return parsed;
+    }
+    
+    // Test session persistence
+    async function testSessionPersistence() {
+      const resultsElement = document.getElementById('session-test-results');
+      
+      resultsElement.textContent = 'Testing session persistence...';
+      
+      // Step 1: Check current auth status
+      const initialCheckResult = await checkAuthStatusForTest();
+      
+      // Step 2: Make a new request to check if session persists
+      const secondCheckResult = await checkAuthStatusForTest();
+      
+      // Compare the results
+      const results = {
+        initialCheck: initialCheckResult,
+        secondCheck: secondCheckResult,
+        sessionPersists: initialCheckResult.isAuthenticated === secondCheckResult.isAuthenticated,
+        analysis: ''
+      };
+      
+      if (initialCheckResult.isAuthenticated && secondCheckResult.isAuthenticated) {
+        results.analysis = 'Session persists correctly across requests.';
+      } else if (!initialCheckResult.isAuthenticated && !secondCheckResult.isAuthenticated) {
+        results.analysis = 'No session was present in either request.';
+      } else {
+        results.analysis = 'Session does not persist correctly across requests!';
+      }
+      
+      resultsElement.textContent = JSON.stringify(results, null, 2);
+    }
+    
+    // Check auth status for testing
+    async function checkAuthStatusForTest() {
+      try {
+        const response = await fetch('/api/check-auth', {
+          credentials: 'include',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'X-Test-Timestamp': Date.now()
+          }
+        });
+        
+        const data = await response.json();
+        
+        return {
+          status: response.status,
+          isAuthenticated: response.ok && data.isAuthenticated,
+          user: data.user,
+          timestamp: new Date().toISOString()
+        };
+      } catch (error) {
+        return {
+          error: error.message,
+          isAuthenticated: false,
+          timestamp: new Date().toISOString()
+        };
+      }
+    }
+    
+    // Check session timeout
+    function checkSessionTimeout() {
+      const resultsElement = document.getElementById('session-test-results');
+      
+      resultsElement.textContent = 'Checking session timeout...';
+      
+      // Get session cookie
+      const cookies = document.cookie.split(';');
+      let sessionCookie = null;
+      
+      cookies.forEach(cookie => {
+        const [name, value] = cookie.split('=').map(part => part.trim());
+        if (name === 'connect.sid') {
+          sessionCookie = value;
+        }
+      });
+      
+      if (!sessionCookie) {
+        resultsElement.textContent = 'No session cookie found. Please log in first.';
+        return;
+      }
+      
+      // Try to decode session cookie
+      try {
+        // Session cookies are usually encoded, but we can check the format
+        const isProbablyEncoded = sessionCookie.includes('%');
+        const containsSignature = sessionCookie.includes('.');
+        
+        const analysis = {
+          sessionCookie: sessionCookie,
+          length: sessionCookie.length,
+          isProbablyEncoded,
+          containsSignature,
+          cookieAge: 'Unknown (server-side only)',
+          recommendation: ''
+        };
+        
+        if (isProbablyEncoded) {
+          analysis.decodedPart = decodeURIComponent(sessionCookie);
+        }
+        
+        if (containsSignature) {
+          analysis.recommendation = 'Cookie appears to be signed, which is good for security.';
+        } else {
+          analysis.recommendation = 'Cookie does not appear to be signed, which may be a security issue.';
+        }
+        
+        resultsElement.textContent = JSON.stringify(analysis, null, 2);
+      } catch (error) {
+        resultsElement.textContent = `Error analyzing session cookie: ${error.message}`;
+      }
+    }
+    
+    // Invalidate session
+    function invalidateSession() {
+      const resultsElement = document.getElementById('session-test-results');
+      
+      // Set an expired session cookie
+      document.cookie = 'connect.sid=invalid; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      
+      resultsElement.textContent = 'Session invalidated. The connect.sid cookie has been set to an invalid value.';
+      
+      // Update auth status
+      checkAuthStatus();
+      refreshCookies();
+    }
+    
+    // Set custom cookie
+    function setCookie() {
+      const name = document.getElementById('cookie-name').value;
+      const value = document.getElementById('cookie-value').value;
+      
+      if (!name) {
+        alert('Please enter a cookie name');
+        return;
+      }
+      
+      document.cookie = `${name}=${value}; path=/;`;
+      alert(`Cookie ${name} set!`);
+      refreshCookies();
+    }
+    
+    // Delete cookie
+    function deleteCookie() {
+      const name = document.getElementById('cookie-name').value;
+      
+      if (!name) {
+        alert('Please enter a cookie name');
+        return;
+      }
+      
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+      alert(`Cookie ${name} deleted!`);
+      refreshCookies();
+    }
+    
+    // Send custom request
+    async function sendCustomRequest() {
+      const url = document.getElementById('custom-url').value;
+      const headersText = document.getElementById('custom-headers').value;
+      const responseElement = document.getElementById('custom-request-response');
+      
+      responseElement.textContent = `Sending request to ${url}...`;
+      
+      try {
+        const headers = JSON.parse(headersText);
+        
+        const response = await fetch(url, {
+          credentials: 'include',
+          headers
+        });
+        
+        const result = {
+          status: response.status,
+          statusText: response.statusText,
+          headers: {}
+        };
+        
+        response.headers.forEach((value, key) => {
+          result.headers[key] = value;
+        });
+        
+        try {
+          result.body = await response.json();
+        } catch (e) {
+          result.body = await response.text();
+        }
+        
+        responseElement.textContent = JSON.stringify(result, null, 2);
+      } catch (error) {
+        console.error('Custom request error:', error);
+        responseElement.textContent = `Error: ${error.message}\n${error.stack}`;
+      }
+    }
+  </script>
+</body>
+</html>

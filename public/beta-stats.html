@@ -1,0 +1,208 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beta Stats Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        .stat-card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border: 1px solid #e5e7eb;
+        }
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #7C3AED;
+        }
+        .stat-label {
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="container mx-auto px-4 py-8">
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">Beta Stats Dashboard</h1>
+            <button onclick="refreshStats()" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">
+                Refresh Data
+            </button>
+        </div>
+
+        <!-- Core Metrics -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="stat-card">
+                <div class="stat-number" id="totalBetaUsers">-</div>
+                <div class="stat-label">Total Beta Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="todaySignups">-</div>
+                <div class="stat-label">Today's Signups</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalVisits">-</div>
+                <div class="stat-label">Total Page Visits</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="conversionRate">-</div>
+                <div class="stat-label">Conversion Rate</div>
+            </div>
+        </div>
+
+        <!-- Recent Signups -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold mb-4">Recent Beta Signups</h2>
+                <div id="recentSignups" class="space-y-2">
+                    <div class="text-gray-500">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Traffic Sources -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold mb-4">Traffic Sources</h2>
+                <div id="trafficSources" class="space-y-2">
+                    <div class="text-gray-500">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- All Beta Users -->
+        <div class="mt-8 bg-white rounded-lg shadow p-6">
+            <h2 class="text-xl font-semibold mb-4">All Beta Users</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full table-auto">
+                    <thead>
+                        <tr class="bg-gray-50">
+                            <th class="px-4 py-2 text-left">Email</th>
+                            <th class="px-4 py-2 text-left">Company</th>
+                            <th class="px-4 py-2 text-left">Name</th>
+                            <th class="px-4 py-2 text-left">Signup Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="allBetaUsers">
+                        <tr>
+                            <td colspan="4" class="px-4 py-2 text-gray-500 text-center">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function loadStats() {
+            try {
+                console.log('Fetching beta stats...');
+                
+                // Go directly to the API endpoint
+                const response = await fetch('/api/beta-stats');
+                
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers.get('content-type'));
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Error response:', errorText);
+                    throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+                }
+                
+                // Check content type before parsing as JSON
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const responseText = await response.text();
+                    console.error('Non-JSON response received:', responseText.substring(0, 200) + '...');
+                    throw new Error('Server returned HTML instead of JSON. Check server logs.');
+                }
+                
+                const data = await response.json();
+                console.log('Stats data:', data);
+
+                // Update core metrics
+                document.getElementById('totalBetaUsers').textContent = data.totalBetaUsers?.count || 0;
+                document.getElementById('todaySignups').textContent = data.todaySignups?.count || 0;
+                document.getElementById('totalVisits').textContent = data.totalBetaPageVisits?.count || 0;
+                document.getElementById('conversionRate').textContent = (data.conversionRate?.rate || 0) + '%';
+
+                // Update recent signups
+                const recentSignupsEl = document.getElementById('recentSignups');
+                if (data.recentSignups && data.recentSignups.length > 0) {
+                    recentSignupsEl.innerHTML = data.recentSignups.map(user => 
+                        `<div class="flex justify-between items-center py-2 border-b">
+                            <div>
+                                <div class="font-medium">${user.email}</div>
+                                <div class="text-sm text-gray-500">${user.company_name}</div>
+                            </div>
+                            <div class="text-sm text-gray-500">${new Date(user.created_at).toLocaleDateString()}</div>
+                        </div>`
+                    ).join('');
+                } else {
+                    recentSignupsEl.innerHTML = '<div class="text-gray-500">No signups yet</div>';
+                }
+
+                // Update traffic sources
+                const trafficSourcesEl = document.getElementById('trafficSources');
+                if (data.visitsBySource && data.visitsBySource.length > 0) {
+                    trafficSourcesEl.innerHTML = data.visitsBySource.map(source => 
+                        `<div class="flex justify-between items-center py-2 border-b">
+                            <span class="font-medium">${source.source}</span>
+                            <span class="text-gray-600">${source.visits} visits</span>
+                        </div>`
+                    ).join('');
+                } else {
+                    trafficSourcesEl.innerHTML = '<div class="text-gray-500">No traffic data</div>';
+                }
+
+                // Update all beta users table
+                const allBetaUsersEl = document.getElementById('allBetaUsers');
+                if (data.allBetaUsers && data.allBetaUsers.length > 0) {
+                    allBetaUsersEl.innerHTML = data.allBetaUsers.map(user => 
+                        `<tr class="border-b">
+                            <td class="px-4 py-2">${user.email}</td>
+                            <td class="px-4 py-2">${user.company_name || '-'}</td>
+                            <td class="px-4 py-2">${user.full_name || '-'}</td>
+                            <td class="px-4 py-2">${new Date(user.created_at).toLocaleDateString()}</td>
+                        </tr>`
+                    ).join('');
+                } else {
+                    allBetaUsersEl.innerHTML = '<tr><td colspan="4" class="px-4 py-2 text-gray-500 text-center">No beta users found</td></tr>';
+                }
+
+            } catch (error) {
+                console.error('Error loading stats:', error);
+                
+                // Show specific error information
+                const errorMessage = `<div class="text-red-500">
+                    <strong>Error loading data:</strong><br>
+                    ${error.message}<br>
+                    <small class="text-gray-500">Check console for details</small>
+                </div>`;
+                
+                document.getElementById('recentSignups').innerHTML = errorMessage;
+                document.getElementById('trafficSources').innerHTML = errorMessage;
+                
+                // Set error values for stats
+                document.getElementById('totalBetaUsers').textContent = 'Error';
+                document.getElementById('todaySignups').textContent = 'Error';
+                document.getElementById('totalVisits').textContent = 'Error';
+                document.getElementById('conversionRate').textContent = 'Error';
+            }
+        }
+
+        function refreshStats() {
+            loadStats();
+        }
+
+        // Load stats on page load
+        document.addEventListener('DOMContentLoaded', loadStats);
+
+        // Auto-refresh every 30 seconds
+        setInterval(loadStats, 30000);
+    </script>
+</body>
+</html>

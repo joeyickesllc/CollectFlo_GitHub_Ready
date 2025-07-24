@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!-- Landing page redirect script -->
+  <script>
+    (function() {
+      // Only redirect if we're at exactly the root path
+      if (window.location.pathname === '/' || window.location.pathname === '') {
+        console.log('Root path detected, redirecting to landing page...');
+        
+        // Store the fact that we've redirected to prevent loops
+        if (!sessionStorage.getItem('redirectedFromRoot')) {
+          sessionStorage.setItem('redirectedFromRoot', 'true');
+          
+          // Redirect to landing.html
+          window.location.href = '/landing.html';
+        }
+      } else {
+        // Clear the redirect flag when visiting other pages
+        sessionStorage.removeItem('redirectedFromRoot');
+      }
+    })();
+  </script>
+  <title>Login - CollectFlo</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script src="/nav.js"></script>
+</head>
+<body class="bg-gray-50">
+  <div id="nav-placeholder"></div>
+
+  <div class="container mx-auto px-4 py-16">
+    <div class="max-w-md mx-auto">
+      <h1 class="text-3xl font-bold mb-6 text-center">Welcome to CollectFlo</h1>
+      <p class="text-gray-600 mb-8 text-center">Automated collections. Accelerated cash flow.</p>
+
+      <form onsubmit="handleLogin(event)" class="space-y-6 bg-white p-8 rounded-lg shadow">
+        <div>
+          <label class="block text-sm font-medium mb-1">Email</label>
+          <input type="email" id="email" required class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Password</label>
+          <input type="password" id="password" required class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <button type="submit" class="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700">
+          Log In
+        </button>
+      </form>
+
+      <div class="text-center mt-6">
+        <p class="text-gray-600">Don't have an account? 
+          <a href="/signup" class="text-indigo-600 hover:text-indigo-800">Sign up for free trial</a>
+        </p>
+        
+        <!-- Debug: Quick test login button -->
+        <div class="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded">
+          <p class="text-sm text-yellow-800 mb-2">Debug: Test with known working credentials</p>
+          <button type="button" onclick="testLogin()" class="bg-yellow-600 text-white px-4 py-2 rounded text-sm hover:bg-yellow-700">
+            Test Login (test@collectflo.com)
+          </button>
+        </div>
+      </div>
+      
+      <script>
+        async function testLogin() {
+          document.getElementById('email').value = 'test@collectflo.com';
+          document.getElementById('password').value = 'testpass123';
+          
+          // Trigger the login
+          const form = document.querySelector('form');
+          const event = new Event('submit', { bubbles: true, cancelable: true });
+          form.dispatchEvent(event);
+        }
+      </script>
+    </div>
+  </div>
+
+  <script>
+    async function handleLogin(event) {
+      event.preventDefault();
+      
+      // Clear any previous error messages
+      const errorDiv = document.getElementById('error-message');
+      if (errorDiv) errorDiv.remove();
+      
+      const formData = {
+        email: document.getElementById('email').value.trim(),
+        password: document.getElementById('password').value
+      };
+
+      console.log('=== LOGIN ATTEMPT START ===');
+      console.log('Email:', formData.email);
+      console.log('Password length:', formData.password.length);
+      console.log('Timestamp:', new Date().toISOString());
+
+      // Validate inputs
+      if (!formData.email || !formData.password) {
+        showError('Please enter both email and password');
+        return;
+      }
+
+      // Show loading state
+      const submitButton = document.querySelector('button[type="submit"]');
+      const originalText = submitButton.innerHTML;
+      submitButton.disabled = true;
+      submitButton.innerHTML = 'Logging in...';
+
+      try {
+        console.log('Making fetch request to /api/login...');
+        const response = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          credentials: 'same-origin',
+          body: JSON.stringify(formData)
+        });
+
+        console.log('Response received:');
+        console.log('- Status:', response.status);
+        console.log('- Status Text:', response.statusText);
+        console.log('- Headers:', Object.fromEntries(response.headers.entries()));
+
+        let responseText;
+        try {
+          responseText = await response.text();
+          console.log('- Raw Response:', responseText.substring(0, 500));
+        } catch (e) {
+          console.error('Failed to read response text:', e);
+          responseText = '';
+        }
+
+        if (response.ok) {
+          let result;
+          try {
+            result = JSON.parse(responseText);
+            console.log('✅ Login successful:', result);
+            
+            // Wait a moment for session to be fully established
+            setTimeout(() => {
+              window.location.href = result.redirect || '/dashboard';
+            }, 100);
+            return;
+            
+          } catch (parseError) {
+            console.error('Failed to parse success response:', parseError);
+            showError('Login succeeded but response format error. Redirecting...');
+            setTimeout(() => {
+              window.location.href = '/dashboard';
+            }, 1000);
+            return;
+          }
+        } else {
+          let result;
+          try {
+            result = JSON.parse(responseText);
+            console.log('❌ Login failed:', result);
+            showError(result.error || 'Login failed. Please check your credentials.');
+          } catch (parseError) {
+            console.error('Failed to parse error response:', parseError);
+            console.log('Response was HTML or invalid JSON');
+            
+            if (responseText.includes('<!DOCTYPE html>')) {
+              showError('Server error occurred. Please try again.');
+            } else {
+              showError('Login failed. Please check your credentials and try again.');
+            }
+          }
+        }
+      } catch (error) {
+        console.error('❌ Network or fetch error:', error);
+        showError('Connection error. Please check your internet connection and try again.');
+      } finally {
+        // Restore button state
+        submitButton.disabled = false;
+        submitButton.innerHTML = originalText;
+        console.log('=== LOGIN ATTEMPT END ===');
+      }
+    }
+
+    function showError(message) {
+      // Remove any existing error messages
+      const existingError = document.getElementById('error-message');
+      if (existingError) existingError.remove();
+      
+      // Create new error message
+      const errorDiv = document.createElement('div');
+      errorDiv.id = 'error-message';
+      errorDiv.className = 'bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4';
+      errorDiv.innerHTML = `
+        <div class="flex items-center">
+          <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+          </svg>
+          ${message}
+        </div>
+      `;
+      
+      // Insert before the form
+      const form = document.querySelector('form');
+      form.parentNode.insertBefore(errorDiv, form);
+    }
+  </script>
+</body>
+</html>
