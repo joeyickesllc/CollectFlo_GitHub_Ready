@@ -16,7 +16,17 @@ const betaController = require('../controllers/betaController');
 // const invoiceController = require('../controllers/invoiceController');
 // const qboController = require('../controllers/qboController');
 // const testController = require('../controllers/testController');
-const qboController = require('../controllers/qboController');
+// QuickBooks controller is optional (e.g. when env vars are missing in some deploys)
+let qboController;
+try {
+  // eslint-disable-next-line global-require
+  qboController = require('../controllers/qboController');
+} catch (error) {
+  // Do not crash the entire API if the controller cannot be loaded
+  // (missing env vars, build-time lint issues, etc.)
+  // eslint-disable-next-line no-console
+  console.warn('QBO Controller not available in API routes:', error.message);
+}
 
 // Import middleware
 const {
@@ -279,40 +289,25 @@ router.get('/beta-stats', requireAuth, async (req, res, next) => {
 /**
  * QuickBooks Integration Routes
  */
-router.get(
-  '/qbo/status',
-  requireAuth,
-  (req, res, next) => qboController.getConnectionStatus(req, res, next)
-);
+if (qboController) {
+  router.get(
+    '/qbo/status',
+    requireAuth,
+    (req, res, next) => qboController.getConnectionStatus(req, res, next)
+  );
 
-router.post(
-  '/qbo/disconnect',
-  requireAuth,
-  (req, res, next) => qboController.disconnect(req, res, next)
-);
+  router.post(
+    '/qbo/disconnect',
+    requireAuth,
+    (req, res, next) => qboController.disconnect(req, res, next)
+  );
 
-router.get(
-  '/qbo/company-info',
-  requireAuth,
-  (req, res, next) => qboController.getCompanyInfo(req, res, next)
-);
-router.get('/qbo/status', requireAuth, async (req, res, next) => {
-  try {
-    // Will be replaced with qboController.getStatus
-    res.status(501).json({ message: 'Not implemented yet' });
-  } catch (error) {
-    next(error);
-  }
-});
-
-router.post('/qbo/disconnect', requireAuth, async (req, res, next) => {
-  try {
-    // Will be replaced with qboController.disconnect
-    res.status(501).json({ message: 'Not implemented yet' });
-  } catch (error) {
-    next(error);
-  }
-});
+  router.get(
+    '/qbo/company-info',
+    requireAuth,
+    (req, res, next) => qboController.getCompanyInfo(req, res, next)
+  );
+}
 
 /**
  * Test Routes (for development only)

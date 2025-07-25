@@ -16,230 +16,331 @@ const { applySecurityMiddleware } = require('./backend/middleware/securityMiddle
 const cookieParser = require('cookie-parser');   // <-- added
 const { optionalAuth } = require('./backend/middleware/jwtAuthMiddleware'); // new import
 const jwtService   = require('./backend/services/jwtService'); // JWT verification
-const qboController = require('./backend/controllers/qboController'); // QuickBooks OAuth controller
 
+// ---------------------------------------------------------------------------
+// QuickBooks controller (optional)
+// ---------------------------------------------------------------------------
+let qboController;
+try {
+  qboController = require('./backend/controllers/qboController'); // Loads only if deps/env are present
+} catch (error) {
+  console.warn(
+    'QBO Controller not loaded – QuickBooks features disabled:',
+    error.message
+  );
+}
 // Application modules
 const db = require('./backend/db/connection');
 const apiRoutes = require('./backend/routes/api');
 const logger = require('./backend/services/logger');
 const jobQueue = require('./backend/services/jobQueue');
 
-// Initialize Express application
-const app = express();
-const PORT = process.env.PORT || 3000;
+// Migration runner
+const runMigrations = require('./backend/scripts/runMigrations');
+// Tracking middleware
+const { trackPageVisit } = require('./backend/middleware/trackingMiddleware');
 
-// Set up session store with PostgreSQL
-const pgSession = require('connect-pg-simple')(session);
-const sessionConfig = {
-  store: new pgSession({
-    pool: db.pool,                // Connection pool
-    tableName: 'session',         // Use a custom table to store sessions
-    createTableIfMissing: true,   // Auto-create the sessions table if missing
-  }),
-  secret: process.env.SESSION_SECRET || 'collectflo-dev-secret',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    httpOnly: true,
-    maxAge: parseInt(process.env.SESSION_MAX_AGE || '86400000'), // 24 hours
-    sameSite: 'lax'
-  }
-};
-
-if (process.env.NODE_ENV === 'production' && sessionConfig.cookie.secure === true) {
-  app.set('trust proxy', 1); // Trust first proxy
-  logger.info('Session cookies set to secure in production mode');
-} else {
-  logger.warn('Session cookies not set to secure mode - only use in development');
+// ---------------------------------------------------------------------------
+// Redis / Job-Queue mode check
+// ---------------------------------------------------------------------------
+if (jobQueue.usingMockImplementation) {
+  logger.warn(
+    'Redis is not available – job queues running in in-memory fallback mode. ' +
+    'Jobs will NOT persist across restarts.'
+  );
 }
 
-// Set up middleware
-app.use(session(sessionConfig));
-app.use(cookieParser()); // Parse cookies
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Environment variables
+const PORT = process.env.PORT || 3000;
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const IS_PRODUCTION = NODE_ENV === 'production';
+const IS_RENDER = process.env.RENDER === 'true';
+const SESSION_SECRET = process.env.SESSION_SECRET || 'collectflo-dev-secret';
+
+// HTTP server instance for graceful shutdown
+let server;
+
+// Create Express app
+const app = express();
+
+// ---------------------------------------------------------------------------
+// Security / Hardening middleware (helmet, xss-clean, rate-limit, etc.)
+// ---------------------------------------------------------------------------
+applySecurityMiddleware(app);
+
+// CORS configuration
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://collectflo.com', 'https://www.collectflo.com'] 
-    : ['http://localhost:3000', 'http://localhost:5173'],
+  origin: IS_PRODUCTION ? 
+    ['https://collectflo.com', /\.collectflo\.com$/] : 
+    'http://localhost:3000',
   credentials: true
 }));
 
-// Apply security middleware (rate limiting, CSRF protection, etc.)
-applySecurityMiddleware(app);
-
-// Request logging in development
-if (process.env.NODE_ENV !== 'production') {
+// Request logging
+if (IS_PRODUCTION) {
+  // Production: use Winston for structured logging
+  app.use((req, res, next) => {
+    const start = Date.now();
+    
+    // Log when the response finishes
+    res.on('finish', () => {
+      const duration = Date.now() - start;
+      const logLevel = res.statusCode >= 400 ? 'warn' : 'info';
+      
+      logger[logLevel](`HTTP ${req.method} ${req.url} ${res.statusCode} - ${duration}ms`, {
+        method: req.method,
+        url: req.url,
+        statusCode: res.statusCode,
+        duration,
+        contentLength: res.get('content-length'),
+        requestId: req.headers['x-request-id'] || `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        ip: req.ip,
+        userAgent: req.headers['user-agent']
+      });
+    });
+    
+    next();
+  });
+} else {
+  // Development: use Morgan for console-friendly logs
   app.use(morgan('dev'));
 }
 
+// Body parsing middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// ---------------------------------------------------------------------------
+// Cookie parsing middleware (must run BEFORE session middleware so that
+// signed cookies such as accessToken / refreshToken are available)
+// ---------------------------------------------------------------------------
+app.use(cookieParser(SESSION_SECRET));
+
+// ---------------------------------------------------------------------------
+// Session configuration  (simple, memory-based for maximum reliability)
+// ---------------------------------------------------------------------------
+// NOTE:
+// We intentionally use express-session's in-memory store.  This eliminates all
+// database-connection-related failures (e.g. SSL/TLS to PG) at the cost of
+// clearing sessions on server restart—acceptable for reliability.
+
+app.set('trust proxy', 1); // secure cookies behind Render proxy
+
+app.use(session({
+  secret: SESSION_SECRET,
+  resave: false,
+  saveUninitialized: true,
+  // MemoryStore is automatically used when no `store` provided
+  cookie: {
+    secure: IS_PRODUCTION,
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: parseInt(process.env.SESSION_TTL_MS || 86_400_000, 10) // 24 h default
+  }
+}));
+
+// Optional: lightweight debug log when a new session is generated
+app.use((req, res, next) => {
+  if (!req.session.initialised) {
+    logger.info('New session created', { sessionID: req.sessionID });
+    req.session.initialised = true;
+  }
+  next();
+});
+
+// ---------------------------------------------------------------------------
+// Page-visit tracking
+// ---------------------------------------------------------------------------
+// Must be registered BEFORE static file middleware so it only runs once per
+// real page view and not for every asset request.
+app.use(trackPageVisit);
+
 // Configure file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, 'uploads'));
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
+const upload = multer({
+  dest: path.join(__dirname, 'uploads'),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
   }
 });
 
-const upload = multer({ 
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+// Root route handler - MOVED BEFORE static file middleware
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'landing.html'));
 });
 
-// Serve static files
+// Serve static files from the public directory
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Authentication check middleware for protected routes
-app.use((req, res, next) => {
-  // Skip auth check for public routes
-  const publicPaths = [
-    '/', '/index.html', '/login.html', '/signup.html', '/beta.html', 
-    '/beta-signup.html', '/api/login', '/api/signup', '/api/auth/login', 
-    '/api/auth/signup', '/api/beta-signup', '/api/check-auth', 
-    '/api/auth/check', '/api/auth/refresh', '/api/auth-debug',
-    '/health', '/favicon.ico', '/robots.txt', '/sitemap.xml',
-    '/css', '/js', '/images', '/auth-test.html', '/auth-diagnostics.html',
-    '/login-debug.html', '/beta-stats.html'
-  ];
+// API routes
 
-  // Check if the path starts with any of the public paths
-  const isPublicPath = publicPaths.some(publicPath => {
-    return req.path === publicPath || 
-           req.path.startsWith(`${publicPath}/`) ||
-           (publicPath.endsWith('.html') && req.path === publicPath.replace('.html', ''));
-  });
+// ---------------------------------------------------------------------------
+// Inject optionalAuth ONLY for the auth-debug endpoint so that downstream
+// handler has access to req.user when available, without enforcing auth.
+// Must be registered before the main /api router for correct order.
+// ---------------------------------------------------------------------------
+app.use('/api/auth-debug', optionalAuth);
 
-  // Also allow API routes to handle their own auth
-  const isApiPath = req.path.startsWith('/api/');
-
-  if (isPublicPath || isApiPath) {
-    return next();
-  }
-
-  // For protected routes, check JWT token
-  const token = req.cookies.accessToken || 
-                (req.headers.authorization && req.headers.authorization.split(' ')[1]);
-
-  if (!token) {
-    logger.debug(`Auth redirect: ${req.path} (no token)`);
-    return res.redirect('/login.html?redirect=' + encodeURIComponent(req.path));
-  }
-
-  try {
-    // Verify token (will throw if invalid)
-    const decoded = jwtService.verifyAccessToken(token);
-    req.user = decoded;
-    next();
-  } catch (err) {
-    logger.debug(`Auth redirect: ${req.path} (${err.message})`);
-    res.redirect('/login.html?redirect=' + encodeURIComponent(req.path));
-  }
-});
-
-// API Routes
 app.use('/api', apiRoutes);
 
 // ---------------------------------------------------------------------------
-// QuickBooks OAuth routes
+// QuickBooks OAuth routes – register only when controller is available
 // ---------------------------------------------------------------------------
-// optionalAuth allows both authenticated and unauthenticated users to
-// connect their QuickBooks account.  When logged-in, the userId is stored
-// with the tokens; otherwise the flow can still proceed for signup.
-app.get(
-  '/auth/qbo',
-  optionalAuth,
-  (req, res, next) => qboController.initiateOAuth(req, res, next)
-);
+if (qboController) {
+  // optionalAuth lets both logged-in & not-yet-logged-in users connect QBO
+  app.get(
+    '/auth/qbo',
+    optionalAuth,
+    (req, res, next) => qboController.initiateOAuth(req, res, next)
+  );
 
-app.get(
-  '/auth/qbo/callback',
-  optionalAuth,
-  (req, res, next) => qboController.handleOAuthCallback(req, res, next)
-);
+  app.get(
+    '/auth/qbo/callback',
+    optionalAuth,
+    (req, res, next) => qboController.handleOAuthCallback(req, res, next)
+  );
+} else {
+  // Fallback route that makes it obvious QBO is disabled
+  app.get('/auth/qbo', (_, res) => {
+    res
+      .status(503)
+      .send('QuickBooks integration is currently unavailable on this deployment.');
+  });
+}
 
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime()
+    environment: NODE_ENV
   });
 });
 
-// Handle 404s
-app.use((req, res) => {
-  if (req.accepts('html')) {
-    return res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
-  }
-  
-  if (req.accepts('json')) {
-    return res.status(404).json({ error: 'Not found' });
-  }
-  
-  res.status(404).type('txt').send('Not found');
-});
+// Serve HTML pages for various routes
+const htmlRoutes = [
+  { path: '/login', file: 'login.html' },
+  { path: '/signup', file: 'signup.html' },
+  { path: '/dashboard', file: 'dashboard.html', auth: true },
+  { path: '/settings', file: 'settings.html', auth: true },
+  { path: '/templates', file: 'templates.html', auth: true },
+  { path: '/onboarding', file: 'onboarding.html', auth: true },
+  { path: '/beta', file: 'beta.html' },
+  { path: '/beta-signup', file: 'beta-signup.html' },
+  { path: '/beta-onboarding', file: 'beta-onboarding.html', auth: true },
+  { path: '/beta-stats', file: 'beta-stats.html', auth: true },
+  { path: '/pay/:invoiceId', file: 'pay.html' },
+  { path: '/payment-success', file: 'payment-success.html' },
+  { path: '/privacy', file: 'privacy.html' },
+  { path: '/eula', file: 'eula.html' },
+  { path: '/help', file: 'help.html' }
+];
 
-// Global error handler
-app.use((err, req, res, next) => {
-  const statusCode = err.statusCode || 500;
-  
-  // Log the error
-  logger.error(`Error: ${err.message}`, {
-    stack: err.stack,
-    path: req.path,
-    method: req.method,
-    statusCode
-  });
-  
-  // Send appropriate response based on request type
-  if (req.accepts('html')) {
-    res.status(statusCode).send(`
-      <html>
-        <head><title>Error</title></head>
-        <body>
-          <h1>Error</h1>
-          <p>${process.env.NODE_ENV === 'production' ? 'An error occurred' : err.message}</p>
-          ${process.env.NODE_ENV === 'production' ? '' : `<pre>${err.stack}</pre>`}
-          <p><a href="/">Return to home page</a></p>
-        </body>
-      </html>
-    `);
-  } else {
-    res.status(statusCode).json({
-      error: process.env.NODE_ENV === 'production' ? 'An error occurred' : err.message,
-      stack: process.env.NODE_ENV === 'production' ? undefined : err.stack
-    });
-  }
-});
+// Register HTML routes
+htmlRoutes.forEach(route => {
+  app.get(route.path, (req, res) => {
+    // Check if route requires authentication
+    if (route.auth) {
+      const token = req.cookies && req.cookies.accessToken;
 
-// Start the server
-app.listen(PORT, async () => {
-  logger.info(`Server running on port ${PORT}`);
-  
-  try {
-    // Initialize job queue
-    await jobQueue.init();
-    logger.info('Job queue initialized successfully');
+      // No token at all → redirect to login
+      if (!token) {
+        return res.redirect('/login?redirect=' + encodeURIComponent(req.path));
+      }
+
+      // Verify token; clear cookies & redirect on failure
+      try {
+        jwtService.verifyToken(token, 'access');
+      } catch (err) {
+        // Invalid / expired token – clean up and force re-login
+        res.clearCookie('accessToken', { path: '/' });
+        res.clearCookie('refreshToken', { path: '/' });
+        return res.redirect('/login?redirect=' + encodeURIComponent(req.path));
+      }
+    }
     
-    // Run database migrations if needed
-    if (process.env.AUTO_RUN_MIGRATIONS === 'true') {
-      const { runMigrations } = require('./backend/scripts/runMigrations');
-      await runMigrations();
-      logger.info('Database migrations completed successfully');
+    res.sendFile(path.join(__dirname, 'public', route.file));
+  });
+});
+
+// Catch-all route for 404s
+app.use((req, res) => {
+  res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  logger.error('Unhandled error in API route: ' + req.method + ' ' + req.url, {
+    method: req.method,
+    url: req.url,
+    error: err.message,
+    stack: err.stack
+  });
+  
+  res.status(err.status || 500).json({
+    error: IS_PRODUCTION ? 'An unexpected error occurred' : err.message
+  });
+});
+
+// Application startup
+async function startServer() {
+  try {
+    // Run database migrations
+    await runMigrations();
+    
+    // Start the server and keep a reference for graceful shutdown
+    server = app.listen(PORT, () => {
+      logger.info(`CollectFlo server listening on port ${PORT} in ${NODE_ENV} mode`);
+    });
+
+    // Initialize scheduled jobs only after successful start
+    try {
+      require('./services/scheduler');
+      logger.info('Scheduler initialised successfully');
+    } catch (schedErr) {
+      logger.error('Scheduler failed to initialise', { error: schedErr });
+      // Do NOT crash the whole app – core API can still function without scheduler
     }
   } catch (error) {
-    logger.error('Error during server initialization:', error);
+    logger.error('Failed to start application due to startup error', { error });
+    process.exit(1); // Exit with failure so Render restarts / reports the issue
   }
-});
+}
+
+// Start the application
+startServer();
 
 // Handle graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down gracefully');
-  // Close database connections, job queues, etc.
-  process.exit(0);
-});
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
 
-module.exports = app; // Export for testing
+async function gracefulShutdown() {
+  logger.info('Received shutdown signal, closing connections...');
+  
+  // Close the HTTP server first to stop accepting new requests
+  if (server) {
+    server.close();
+  }
+  
+  try {
+    // Shutdown job queues
+    try {
+      await jobQueue.shutdown();
+    } catch (jqErr) {
+      logger.error('Error shutting down job queues', { error: jqErr });
+    }
+
+    // Close database connections
+    try {
+      await db.close();
+    } catch (dbErr) {
+      logger.error('Error closing database connections', { error: dbErr });
+    }
+    
+    logger.info('Graceful shutdown completed');
+    process.exit(0);
+  } catch (error) {
+    logger.error('Error during graceful shutdown', { error });
+    process.exit(1);
+  }
+}
