@@ -42,6 +42,7 @@ const {
   signupRateLimiter,
 } = require('../middleware/securityMiddleware');
 const logger = require('../services/logger');
+const db = require('../db/connection'); // <-- DB connection for setup route
 
 // Mount dedicated authentication routes (JWT-based)
 const authRoutes = require('./authRoutes');
@@ -318,6 +319,77 @@ router.post('/test-email', async (req, res, next) => {
     res.status(501).json({ message: 'Not implemented yet' });
   } catch (error) {
     next(error);
+  }
+});
+
+/**
+ * ---------------------------------------------------------------------------
+ * Temporary DB-setup Endpoint
+ * ---------------------------------------------------------------------------
+ * GET /api/setup-qbo-table
+ *
+ * • Checks if the `qbo_tokens` table exists.
+ * • Creates the table and required indexes if missing.
+ * • Returns JSON describing the action taken.
+ *
+ * SECURITY NOTE:
+ *   Expose this only in development.  Disable or remove in production once
+ *   migrations are fixed.
+ */
+router.get('/setup-qbo-table', async (req, res) => {
+  try {
+    // Check table existence
+    const { rows } = await db.query(
+      `SELECT EXISTS (
+         SELECT FROM information_schema.tables
+         WHERE table_schema = 'public' AND table_name = 'qbo_tokens'
+       ) AS exists;`
+    );
+
+    if (rows[0].exists) {
+      logger.info('setup-qbo-table: qbo_tokens already exists');
+      return res.status(200).json({
+        success : true,
+        created : false,
+        message : 'qbo_tokens table already exists'
+      });
+    }
+
+    // Run DDL in a transaction
+    await db.query('BEGIN');
+    await db.query(`
+      CREATE TABLE public.qbo_tokens (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        encrypted_tokens TEXT NOT NULL,
+        iv TEXT NOT NULL,
+        auth_tag TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );`);
+    await db.query(
+      'CREATE INDEX idx_qbo_tokens_user_id ON public.qbo_tokens(user_id);'
+    );
+    await db.query(
+      'CREATE INDEX idx_qbo_tokens_updated_at ON public.qbo_tokens(updated_at);'
+    );
+    await db.query('COMMIT');
+
+    logger.info('setup-qbo-table: qbo_tokens table created successfully');
+    return res.status(201).json({
+      success : true,
+      created : true,
+      message : 'qbo_tokens table created'
+    });
+  } catch (error) {
+    // Roll back if we’re mid-transaction
+    try { await db.query('ROLLBACK'); } catch (_) {}
+    logger.error('setup-qbo-table failed', { error: error.message });
+    return res.status(500).json({
+      success : false,
+      message : 'Failed to set up qbo_tokens table',
+      error   : error.message
+    });
   }
 });
 
