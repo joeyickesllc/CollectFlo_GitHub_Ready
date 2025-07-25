@@ -125,71 +125,164 @@ async function initiateOAuth(req, res) {
  * @param {Object} res - Express response object
  */
 async function handleOAuthCallback(req, res) {
+  const userId = req.user?.id;
+  const redirectTo = req.session.qboRedirectAfter || 'beta-onboarding';
+  
   try {
     const { code, state, realmId, error } = req.query;
-    const userId = req.user?.id;
     
     // Handle error from QuickBooks
     if (error) {
-      logger.error('QBO OAuth error from Intuit', { error, userId });
-      return res.redirect(`/settings?error=qbo_oauth_failed&reason=${encodeURIComponent(error)}`);
+      logger.error('QBO OAuth error from Intuit', { 
+        error, 
+        userId,
+        query: req.query,
+        headers: req.headers
+      });
+      return res.redirect(`/${redirectTo}?error=qbo_oauth_failed&reason=${encodeURIComponent(error)}`);
     }
     
     // Verify required parameters
     if (!code || !state || !realmId) {
-      logger.error('QBO OAuth callback missing parameters', { userId });
-      return res.redirect('/settings?error=qbo_missing_params');
+      const missingParams = [];
+      if (!code) missingParams.push('code');
+      if (!state) missingParams.push('state');
+      if (!realmId) missingParams.push('realmId');
+      
+      logger.error('QBO OAuth callback missing parameters', { 
+        userId, 
+        missingParams,
+        query: req.query
+      });
+      return res.redirect(`/${redirectTo}?error=qbo_missing_params&missing=${missingParams.join(',')}`);
     }
     
     // Verify state parameter to prevent CSRF attacks
     if (!verifyStateParam(req, state)) {
-      logger.error('QBO OAuth state verification failed', { userId });
-      return res.redirect('/settings?error=qbo_invalid_state');
+      logger.error('QBO OAuth state verification failed', { 
+        userId,
+        providedState: state,
+        storedState: req.session.qboOAuthState,
+        stateTimestamp: req.session.qboOAuthStateTimestamp,
+        currentTime: Date.now(),
+        timeDifference: req.session.qboOAuthStateTimestamp ? Date.now() - req.session.qboOAuthStateTimestamp : 'N/A'
+      });
+      return res.redirect(`/${redirectTo}?error=qbo_invalid_state`);
     }
     
     // Clear the state from session after verification
     clearStateFromSession(req);
     
-    // Exchange the authorization code for tokens
-    const tokenResponse = await axios.post(
-      QBO_TOKEN_URL,
-      new URLSearchParams({
-        grant_type: 'authorization_code',
-        code,
-        redirect_uri: secrets.qbo.redirectUri
-      }),
-      {
-        headers: {
-          'Authorization': `Basic ${Buffer.from(`${secrets.qbo.clientId}:${secrets.qbo.clientSecret}`).toString('base64')}`,
-          'Content-Type': 'application/x-www-form-urlencoded'
+    try {
+      // Exchange the authorization code for tokens
+      logger.debug('Exchanging authorization code for tokens', { 
+        userId, 
+        realmId,
+        redirectUri: secrets.qbo.redirectUri
+      });
+      
+      const tokenResponse = await axios.post(
+        QBO_TOKEN_URL,
+        new URLSearchParams({
+          grant_type: 'authorization_code',
+          code,
+          redirect_uri: secrets.qbo.redirectUri
+        }),
+        {
+          headers: {
+            'Authorization': `Basic ${Buffer.from(`${secrets.qbo.clientId}:${secrets.qbo.clientSecret}`).toString('base64')}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
         }
+      );
+      
+      // Store the tokens with the realmId
+      const tokens = {
+        ...tokenResponse.data,
+        realmId,
+        connected_at: new Date().toISOString()
+      };
+      
+      try {
+        // Save tokens to database
+        await saveTokens(tokens, userId);
+        
+        logger.info('QBO OAuth successful', { userId, realmId });
+        
+        // Redirect to the original page or dashboard
+        delete req.session.qboRedirectAfter;
+        
+        return res.redirect(`/${redirectTo}?qbo_connected=true`);
+      } catch (storageError) {
+        // Token storage failure
+        logger.error('QBO token storage failed', { 
+          error: storageError.message, 
+          stack: storageError.stack,
+          userId,
+          realmId,
+          dbError: storageError.cause || 'Unknown database error'
+        });
+        
+        return res.redirect(`/${redirectTo}?error=qbo_storage_failed&reason=database`);
       }
-    );
-    
-    // Store the tokens with the realmId
-    const tokens = {
-      ...tokenResponse.data,
-      realmId,
-      connected_at: new Date().toISOString()
-    };
-    
-    await saveTokens(tokens, userId);
-    
-    logger.info('QBO OAuth successful', { userId, realmId });
-    
-    // Redirect to the original page or dashboard
-    const redirectTo = req.session.qboRedirectAfter || 'dashboard';
-    delete req.session.qboRedirectAfter;
-    
-    res.redirect(`/${redirectTo}?qbo_connected=true`);
+    } catch (tokenExchangeError) {
+      // Token exchange failure
+      const responseData = tokenExchangeError.response?.data || {};
+      const statusCode = tokenExchangeError.response?.status;
+      
+      logger.error('QBO token exchange failed', { 
+        error: tokenExchangeError.message, 
+        stack: tokenExchangeError.stack,
+        statusCode,
+        responseData,
+        userId,
+        realmId,
+        requestId: tokenExchangeError.response?.headers['intuit-tid']
+      });
+      
+      let errorReason = 'api_error';
+      
+      // Determine specific error type
+      if (statusCode === 400) {
+        errorReason = 'invalid_request';
+      } else if (statusCode === 401) {
+        errorReason = 'unauthorized';
+      } else if (statusCode === 403) {
+        errorReason = 'forbidden';
+      } else if (statusCode >= 500) {
+        errorReason = 'server_error';
+      }
+      
+      return res.redirect(`/${redirectTo}?error=qbo_token_exchange_failed&reason=${errorReason}`);
+    }
   } catch (error) {
-    logger.error('QBO OAuth callback failed', { 
+    // General unexpected errors
+    logger.error('QBO OAuth callback failed with unexpected error', { 
       error: error.message, 
+      stack: error.stack,
       response: error.response?.data,
-      userId: req.user?.id 
+      userId,
+      query: req.query,
+      session: {
+        hasQboState: !!req.session.qboOAuthState,
+        hasRedirectAfter: !!req.session.qboRedirectAfter,
+        redirectAfter: req.session.qboRedirectAfter
+      }
     });
     
-    res.redirect('/settings?error=qbo_connection_failed');
+    // Determine error type for better user feedback
+    let errorType = 'unknown';
+    if (error.code === 'ECONNREFUSED' || error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT') {
+      errorType = 'connection';
+    } else if (error.message && error.message.includes('database')) {
+      errorType = 'database';
+    } else if (error.message && error.message.includes('token')) {
+      errorType = 'token';
+    } else if (error.message && error.message.includes('validation')) {
+      errorType = 'validation';
+    }
+    
+    return res.redirect(`/${redirectTo}?error=qbo_connection_failed&type=${errorType}`);
   }
 }
 
@@ -202,10 +295,10 @@ async function handleOAuthCallback(req, res) {
 async function getConnectionStatus(req, res) {
   try {
     const userId = req.user.id;
-    const isConnected = hasValidTokens(userId);
+    const isConnected = await hasValidTokens(userId);
     
     if (isConnected) {
-      const tokens = getTokens(userId);
+      const tokens = await getTokens(userId);
       
       res.status(200).json({
         success: true,
@@ -238,7 +331,7 @@ async function getConnectionStatus(req, res) {
 async function disconnect(req, res) {
   try {
     const userId = req.user.id;
-    const tokens = getTokens(userId);
+    const tokens = await getTokens(userId);
     
     if (!tokens) {
       return res.status(400).json({
@@ -293,7 +386,7 @@ async function disconnect(req, res) {
 async function getCompanyInfo(req, res) {
   try {
     const userId = req.user.id;
-    const tokens = getTokens(userId);
+    const tokens = await getTokens(userId);
     
     if (!tokens || !tokens.access_token || !tokens.realmId) {
       return res.status(400).json({
