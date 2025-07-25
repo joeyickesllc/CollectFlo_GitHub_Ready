@@ -208,6 +208,17 @@ if (qboController) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// TEMPORARY: redirect legacy /callback → /auth/qbo/callback
+// ---------------------------------------------------------------------------
+// Some QuickBooks app configurations pointed to `/callback` instead of the
+// correct `/auth/qbo/callback`.  This route preserves all query parameters
+// and forwards the request to the expected handler.
+app.get('/callback', (req, res) => {
+  const queryString = req.url.split('?')[1] || '';
+  return res.redirect(`/auth/qbo/callback${queryString ? `?${queryString}` : ''}`);
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({
