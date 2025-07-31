@@ -121,6 +121,9 @@ async function reconnectQBO() {
   window.location.href = '/auth/qbo';
 }
 
+// Add event listener for Reconnect QuickBooks button
+document.getElementById('reconnectQboBtn').addEventListener('click', reconnectQBO);
+
 // Initialize
 loadCompanySettings();
 checkQBOConnection();
