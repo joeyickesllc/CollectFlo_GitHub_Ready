@@ -116,52 +116,25 @@ async function saveTokens(tokens, userId = null) {
     // Get current timestamp
     const now = new Date().toISOString();
 
-    // Check if tokens already exist for this user
-    const result = await db.query(
-      'SELECT id FROM qbo_tokens WHERE user_id = $1',
-      [userId]
-    );
+    // Always clear existing tokens to avoid decryption conflicts
+    await db.query('DELETE FROM qbo_tokens WHERE user_id = $1', [userId]);
     
-    const existingRows = result?.rows || [];
-    logger.debug('Checking existing QBO tokens', { 
-      userId, 
-      existingCount: existingRows.length,
-      queryResult: result 
-    });
-
-    if (existingRows.length > 0) {
-      // Update existing tokens
-      await db.query(
-        `UPDATE qbo_tokens
-         SET encrypted_tokens = $1,
-             iv               = $2,
-             auth_tag         = $3,
-             updated_at       = $4
-         WHERE user_id = $5`,
-        [
-          encryptedData.encrypted,
-          encryptedData.iv,
-          encryptedData.authTag,
-          now,
-          userId
-        ]
-      );
-    } else {
-      // Insert new tokens
-      await db.query(
-        `INSERT INTO qbo_tokens
-          (user_id, encrypted_tokens, iv, auth_tag, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [
-          userId,
-          encryptedData.encrypted,
-          encryptedData.iv,
-          encryptedData.authTag,
-          now,
-          now
-        ]
-      );
-    }
+    logger.info('Cleared existing QBO tokens before saving new ones', { userId });
+    
+    // Insert fresh tokens
+    await db.query(
+      `INSERT INTO qbo_tokens
+        (user_id, encrypted_tokens, iv, auth_tag, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        userId,
+        encryptedData.encrypted,
+        encryptedData.iv,
+        encryptedData.authTag,
+        now,
+        now
+      ]
+    );
     
     logger.info('QBO tokens saved successfully', { userId });
     return true;
