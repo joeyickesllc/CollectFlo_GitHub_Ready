@@ -405,12 +405,38 @@ async function disconnect(req, res) {
 async function getCompanyInfo(req, res) {
   try {
     const userId = req.user.id;
-    const tokens = await getValidTokens(userId);
+    logger.debug('Getting company info for user', { userId });
     
-    if (!tokens || !tokens.access_token || !tokens.realmId) {
+    const tokens = await getValidTokens(userId);
+    logger.debug('Retrieved tokens for company info', { 
+      userId,
+      hasTokens: !!tokens,
+      hasAccessToken: tokens ? !!tokens.access_token : false,
+      hasRealmId: tokens ? !!tokens.realmId : false,
+      tokenKeys: tokens ? Object.keys(tokens) : []
+    });
+    
+    if (!tokens) {
+      logger.warn('No tokens found for QBO company info', { userId });
       return res.status(400).json({
         success: false,
-        message: 'QuickBooks not connected'
+        message: 'QuickBooks not connected - no tokens found'
+      });
+    }
+    
+    if (!tokens.access_token) {
+      logger.warn('No access token in QBO tokens', { userId, tokenKeys: Object.keys(tokens) });
+      return res.status(400).json({
+        success: false,
+        message: 'QuickBooks not connected - no access token'
+      });
+    }
+    
+    if (!tokens.realmId) {
+      logger.warn('No realmId in QBO tokens', { userId, tokenKeys: Object.keys(tokens) });
+      return res.status(400).json({
+        success: false,
+        message: 'QuickBooks not connected - no realm ID'
       });
     }
     
