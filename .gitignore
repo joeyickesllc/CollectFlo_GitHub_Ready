@@ -5,3 +5,8 @@ node_modules/
 .DS_Store
 .replit
 coverage/
+.claude/settings.local.json
+debug-qbo-tokens.js
+fix-qbo-tokens-table.js
+clear-qbo-tokens.js
+test-encryption.js
