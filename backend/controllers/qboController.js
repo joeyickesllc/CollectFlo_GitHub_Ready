@@ -14,7 +14,7 @@ const crypto = require('crypto');
 const { URL } = require('url');
 const secrets = require('../config/secrets');
 const logger = require('../services/logger');
-const { saveTokens, getTokens, clearTokens, hasValidTokens } = require('../../services/tokenStore');
+const { saveTokens, getTokens, getValidTokens, clearTokens, hasValidTokens } = require('../../services/tokenStore');
 const { refreshAccessToken } = require('../../services/tokenRefresh');
 
 // QuickBooks API endpoints
@@ -386,7 +386,7 @@ async function disconnect(req, res) {
 async function getCompanyInfo(req, res) {
   try {
     const userId = req.user.id;
-    const tokens = await getTokens(userId);
+    const tokens = await getValidTokens(userId);
     
     if (!tokens || !tokens.access_token || !tokens.realmId) {
       return res.status(400).json({
@@ -437,7 +437,7 @@ async function getCompanyInfo(req, res) {
       if (apiError.response?.status === 401) {
         try {
           // Try to refresh the token
-          await refreshAccessToken();
+          await refreshAccessToken(userId);
           
           // Return a specific response so client can retry
           return res.status(401).json({

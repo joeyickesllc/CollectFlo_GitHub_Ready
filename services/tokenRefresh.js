@@ -1,8 +1,13 @@
 const axios = require('axios');
 const { saveTokens, getTokens } = require('./tokenStore');
+const secrets = require('../backend/config/secrets');
 
-async function refreshAccessToken() {
-  const tokens = getTokens();
+async function refreshAccessToken(userId) {
+  if (!userId) {
+    throw new Error('User ID is required for token refresh');
+  }
+
+  const tokens = await getTokens(userId);
   
   if (!tokens || !tokens.refresh_token) {
     throw new Error('No refresh token available. Please reconnect to QuickBooks.');
@@ -17,7 +22,7 @@ async function refreshAccessToken() {
       }),
       {
         headers: {
-          'Authorization': `Basic ${Buffer.from(`${process.env.QBO_CLIENT_ID}:${process.env.QBO_CLIENT_SECRET}`).toString('base64')}`,
+          'Authorization': `Basic ${Buffer.from(`${secrets.qbo.clientId}:${secrets.qbo.clientSecret}`).toString('base64')}`,
           'Content-Type': 'application/x-www-form-urlencoded'
         }
       }
@@ -29,7 +34,7 @@ async function refreshAccessToken() {
       refreshed_at: new Date().toISOString()
     };
     
-    saveTokens(newTokens);
+    await saveTokens(newTokens, userId);
     return newTokens;
   } catch (error) {
     console.error('Token refresh failed:', error.response?.data);

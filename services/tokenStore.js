@@ -207,22 +207,91 @@ async function hasValidTokens(userId = null) {
   try {
     const tokens = await getTokens(userId);
     
-    if (!tokens) {
+    if (!tokens || !tokens.access_token) {
       return false;
     }
     
-    // Check if access token exists and is not expired
-    // Note: This doesn't verify with QuickBooks, just checks if we have tokens
-    return !!tokens.access_token;
+    // Check if access token is expired
+    // QuickBooks access tokens expire after 1 hour (3600 seconds)
+    if (tokens.created_at || tokens.connected_at) {
+      const tokenCreatedAt = new Date(tokens.created_at || tokens.connected_at);
+      const expiresIn = tokens.expires_in || 3600; // Default to 1 hour
+      const expirationTime = new Date(tokenCreatedAt.getTime() + (expiresIn * 1000));
+      
+      if (new Date() >= expirationTime) {
+        logger.debug('QBO access token expired', { 
+          userId, 
+          tokenCreatedAt: tokenCreatedAt.toISOString(),
+          expirationTime: expirationTime.toISOString(),
+          now: new Date().toISOString()
+        });
+        return false;
+      }
+    }
+    
+    // Check if refresh token exists (needed for token refresh)
+    if (!tokens.refresh_token) {
+      logger.debug('QBO refresh token missing', { userId });
+      return false;
+    }
+    
+    return true;
   } catch (error) {
     logger.error('Failed to check QBO token validity', { error: error.message, userId });
     return false;
   }
 }
 
+/**
+ * Get valid tokens for a user, automatically refreshing if needed
+ * 
+ * @param {number} userId - The user ID to get tokens for
+ * @returns {Object|null} - The tokens object or null if unavailable
+ */
+async function getValidTokens(userId) {
+  try {
+    const tokens = await getTokens(userId);
+    
+    if (!tokens || !tokens.access_token) {
+      return null;
+    }
+    
+    // Check if access token is expired
+    if (tokens.created_at || tokens.connected_at) {
+      const tokenCreatedAt = new Date(tokens.created_at || tokens.connected_at);
+      const expiresIn = tokens.expires_in || 3600; // Default to 1 hour
+      const expirationTime = new Date(tokenCreatedAt.getTime() + (expiresIn * 1000));
+      
+      // If token is expired or will expire in next 5 minutes, refresh it
+      const fiveMinutesFromNow = new Date(Date.now() + (5 * 60 * 1000));
+      if (fiveMinutesFromNow >= expirationTime) {
+        logger.debug('QBO access token expired or expiring soon, attempting refresh', { userId });
+        
+        try {
+          const { refreshAccessToken } = require('./tokenRefresh');
+          const refreshedTokens = await refreshAccessToken(userId);
+          return refreshedTokens;
+        } catch (refreshError) {
+          logger.error('Failed to refresh expired QBO tokens', { 
+            error: refreshError.message, 
+            userId 
+          });
+          return null;
+        }
+      }
+    }
+    
+    return tokens;
+  } catch (error) {
+    logger.error('Failed to get valid QBO tokens', { error: error.message, userId });
+    return null;
+  }
+}
+
 module.exports = {
   saveTokens,
   getTokens,
+  getValidTokens,
   clearTokens,
   hasValidTokens
 };

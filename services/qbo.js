@@ -64,7 +64,7 @@ async function makeQBORequest(endpoint, params = {}, userId = null) {
     if (error.response?.status === 401) {
       try {
         const { refreshAccessToken } = require('./tokenRefresh');
-        await refreshAccessToken();
+        await refreshAccessToken(userId);
         
         // Retry the request with new token
         const newTokens = await getTokens(userId);
@@ -109,8 +109,8 @@ async function checkPaymentStatus(invoiceId) {
 }
 
 // Create payment link for QuickBooks invoice
-async function createPaymentLink(invoiceId, amount) {
-  const tokens = getTokens();
+async function createPaymentLink(invoiceId, amount, userId) {
+  const tokens = await getTokens(userId);
   if (!tokens || !tokens.access_token) {
     throw new Error('No valid QuickBooks tokens available');
   }
