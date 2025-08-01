@@ -26,9 +26,19 @@ const IV_LENGTH = 16; // For AES, this is always 16 bytes
 function encrypt(text) {
   try {
     // Use session secret as encryption key (hash it to get correct length)
-    const key = crypto.createHash('sha256').update(secrets.app.sessionSecret).digest();
+    const sessionSecret = secrets.app.sessionSecret;
+    const key = crypto.createHash('sha256').update(sessionSecret).digest();
     const iv = crypto.randomBytes(IV_LENGTH);
     const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, key, iv);
+    
+    // Log SESSION_SECRET info for debugging (first/last 4 chars only for security)
+    logger.info('Token encryption SESSION_SECRET', {
+      secretStart: sessionSecret ? sessionSecret.substring(0, 4) : 'null',
+      secretEnd: sessionSecret ? sessionSecret.substring(sessionSecret.length - 4) : 'null',
+      secretLength: sessionSecret ? sessionSecret.length : 0,
+      secretExists: !!sessionSecret,
+      keyHash: key.toString('hex').substring(0, 8) + '...'
+    });
     
     let encrypted = cipher.update(text, 'utf8', 'hex');
     encrypted += cipher.final('hex');
@@ -55,9 +65,19 @@ function encrypt(text) {
  */
 function decrypt(encData) {
   try {
-    const key = crypto.createHash('sha256').update(secrets.app.sessionSecret).digest();
+    const sessionSecret = secrets.app.sessionSecret;
+    const key = crypto.createHash('sha256').update(sessionSecret).digest();
     const iv = Buffer.from(encData.iv, 'hex');
     const authTag = Buffer.from(encData.authTag, 'hex');
+    
+    // Log SESSION_SECRET info for debugging (first/last 4 chars only for security)
+    logger.info('Token decryption SESSION_SECRET', {
+      secretStart: sessionSecret ? sessionSecret.substring(0, 4) : 'null',
+      secretEnd: sessionSecret ? sessionSecret.substring(sessionSecret.length - 4) : 'null',
+      secretLength: sessionSecret ? sessionSecret.length : 0,
+      secretExists: !!sessionSecret,
+      keyHash: key.toString('hex').substring(0, 8) + '...'
+    });
     
     const decipher = crypto.createDecipheriv(ENCRYPTION_ALGORITHM, key, iv);
     decipher.setAuthTag(authTag);
@@ -67,7 +87,11 @@ function decrypt(encData) {
     
     return decrypted;
   } catch (error) {
-    logger.error('Token decryption failed', { error: error.message });
+    logger.error('Token decryption failed', { 
+      error: error.message,
+      secretExists: !!secrets.app.sessionSecret,
+      secretLength: secrets.app.sessionSecret ? secrets.app.sessionSecret.length : 0
+    });
     throw new Error('Failed to decrypt token data');
   }
 }
