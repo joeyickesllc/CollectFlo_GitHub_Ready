@@ -183,6 +183,17 @@ async function getTokens(userId = null) {
       return null;
     }
     
+    // Log the token data structure before decryption attempt
+    logger.info('About to decrypt token data', {
+      userId,
+      hasEncryptedTokens: !!tokenData.encrypted_tokens,
+      hasIv: !!tokenData.iv,
+      hasAuthTag: !!tokenData.auth_tag,
+      encryptedLength: tokenData.encrypted_tokens ? tokenData.encrypted_tokens.length : 0,
+      ivLength: tokenData.iv ? tokenData.iv.length : 0,
+      authTagLength: tokenData.auth_tag ? tokenData.auth_tag.length : 0
+    });
+
     // Decrypt the tokens
     const decrypted = decrypt({
       encrypted: tokenData.encrypted_tokens,
@@ -190,6 +201,7 @@ async function getTokens(userId = null) {
       authTag: tokenData.auth_tag
     });
     
+    logger.info('Token decryption completed successfully', { userId });
     return JSON.parse(decrypted);
   } catch (error) {
     logger.error('Failed to retrieve QBO tokens', { 
