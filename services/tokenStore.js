@@ -37,7 +37,9 @@ function encrypt(text) {
       secretEnd: sessionSecret ? sessionSecret.substring(sessionSecret.length - 4) : 'null',
       secretLength: sessionSecret ? sessionSecret.length : 0,
       secretExists: !!sessionSecret,
-      keyHash: key.toString('hex').substring(0, 8) + '...'
+      keyHash: key.toString('hex').substring(0, 8) + '...',
+      fullKeyHash: crypto.createHash('sha256').update(key).digest('hex').substring(0, 16),
+      processEnvSecret: process.env.SESSION_SECRET ? process.env.SESSION_SECRET.substring(0, 4) + '...' + process.env.SESSION_SECRET.substring(process.env.SESSION_SECRET.length - 4) : 'undefined'
     });
     
     let encrypted = cipher.update(text, 'utf8', 'hex');
@@ -76,7 +78,9 @@ function decrypt(encData) {
       secretEnd: sessionSecret ? sessionSecret.substring(sessionSecret.length - 4) : 'null',
       secretLength: sessionSecret ? sessionSecret.length : 0,
       secretExists: !!sessionSecret,
-      keyHash: key.toString('hex').substring(0, 8) + '...'
+      keyHash: key.toString('hex').substring(0, 8) + '...',
+      fullKeyHash: crypto.createHash('sha256').update(key).digest('hex').substring(0, 16),
+      processEnvSecret: process.env.SESSION_SECRET ? process.env.SESSION_SECRET.substring(0, 4) + '...' + process.env.SESSION_SECRET.substring(process.env.SESSION_SECRET.length - 4) : 'undefined'
     });
     
     const decipher = crypto.createDecipheriv(ENCRYPTION_ALGORITHM, key, iv);
