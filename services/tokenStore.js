@@ -178,6 +178,21 @@ async function getTokens(userId = null) {
     const rows = result?.rows || [];
     const tokenData = rows[0];
     
+    logger.info('Database token query result', {
+      userId,
+      rowsLength: rows.length,
+      hasTokenData: !!tokenData,
+      tokenDataKeys: tokenData ? Object.keys(tokenData) : [],
+      tokenDataValues: tokenData ? {
+        hasEncryptedTokens: !!tokenData.encrypted_tokens,
+        hasIv: !!tokenData.iv,
+        hasAuthTag: !!tokenData.auth_tag,
+        encryptedTokensType: typeof tokenData.encrypted_tokens,
+        ivType: typeof tokenData.iv,
+        authTagType: typeof tokenData.auth_tag
+      } : null
+    });
+    
     if (!tokenData) {
       logger.debug('No QBO tokens found for user', { userId });
       return null;
