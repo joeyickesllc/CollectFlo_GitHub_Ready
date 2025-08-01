@@ -215,7 +215,13 @@ async function getTokens(userId = null) {
     
     return JSON.parse(decrypted);
   } catch (error) {
-    logger.error('Failed to retrieve QBO tokens', { error: error.message, userId });
+    logger.error('Failed to retrieve QBO tokens', { 
+      error: error.message, 
+      errorStack: error.stack,
+      userId,
+      tokenDataExists: !!tokenData,
+      tokenDataKeys: tokenData ? Object.keys(tokenData) : []
+    });
     return null;
   }
 }
