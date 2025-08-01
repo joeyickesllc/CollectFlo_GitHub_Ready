@@ -93,12 +93,19 @@ async function saveTokens(tokens, userId = null) {
     const now = new Date().toISOString();
 
     // Check if tokens already exist for this user
-    const { rows: existingRows } = await db.query(
+    const result = await db.query(
       'SELECT id FROM qbo_tokens WHERE user_id = $1',
       [userId]
     );
+    
+    const existingRows = result?.rows || [];
+    logger.debug('Checking existing QBO tokens', { 
+      userId, 
+      existingCount: existingRows.length,
+      queryResult: result 
+    });
 
-    if (existingRows.length) {
+    if (existingRows.length > 0) {
       // Update existing tokens
       await db.query(
         `UPDATE qbo_tokens
@@ -158,7 +165,7 @@ async function saveTokens(tokens, userId = null) {
 async function getTokens(userId = null) {
   try {
     // Get the encrypted tokens from the database
-    const { rows } = await db.query(
+    const result = await db.query(
       `SELECT encrypted_tokens, iv, auth_tag
          FROM qbo_tokens
         WHERE user_id = $1
@@ -166,6 +173,8 @@ async function getTokens(userId = null) {
         LIMIT 1`,
       [userId]
     );
+    
+    const rows = result?.rows || [];
     const tokenData = rows[0];
     
     if (!tokenData) {
