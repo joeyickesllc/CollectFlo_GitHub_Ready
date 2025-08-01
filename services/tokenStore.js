@@ -175,7 +175,8 @@ async function getTokens(userId = null) {
       [userId]
     );
     
-    const rows = result?.rows || [];
+    // The db wrapper returns rows directly, not { rows: [...] }
+    const rows = result || [];
     const tokenData = rows[0];
     
     logger.info('Database token query result', {
