@@ -128,6 +128,15 @@ async function handleOAuthCallback(req, res) {
   const userId = req.user?.id;
   const redirectTo = req.session.qboRedirectAfter || 'beta-onboarding';
   
+  // Log user authentication status during callback
+  logger.info('QBO OAuth callback initiated', { 
+    userId, 
+    hasUser: !!req.user,
+    userEmail: req.user?.email,
+    redirectTo,
+    sessionId: req.sessionID
+  });
+  
   try {
     const { code, state, realmId, error } = req.query;
     
@@ -204,6 +213,16 @@ async function handleOAuthCallback(req, res) {
       };
       
       try {
+        // Check if user is authenticated before saving tokens
+        if (!userId) {
+          logger.error('QBO OAuth callback: User not authenticated', { 
+            hasUser: !!req.user,
+            sessionID: req.sessionID,
+            realmId 
+          });
+          return res.redirect(`/${redirectTo}?error=qbo_auth_required&reason=not_logged_in`);
+        }
+        
         // Save tokens to database
         await saveTokens(tokens, userId);
         

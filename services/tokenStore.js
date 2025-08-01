@@ -135,7 +135,16 @@ async function saveTokens(tokens, userId = null) {
     logger.info('QBO tokens saved successfully', { userId });
     return true;
   } catch (error) {
-    logger.error('Failed to save QBO tokens', { error: error.message, userId });
+    logger.error('Failed to save QBO tokens', { 
+      error: error.message, 
+      stack: error.stack,
+      code: error.code,
+      detail: error.detail,
+      constraint: error.constraint,
+      table: error.table,
+      column: error.column,
+      userId 
+    });
     throw new Error(`Failed to save QuickBooks tokens: ${error.message}`);
   }
 }
