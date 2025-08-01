@@ -405,10 +405,10 @@ async function disconnect(req, res) {
 async function getCompanyInfo(req, res) {
   try {
     const userId = req.user.id;
-    logger.debug('Getting company info for user', { userId });
+    logger.info('Getting QBO company info for user', { userId });
     
     const tokens = await getValidTokens(userId);
-    logger.debug('Retrieved tokens for company info', { 
+    logger.info('Retrieved QBO tokens for company info', { 
       userId,
       hasTokens: !!tokens,
       hasAccessToken: tokens ? !!tokens.access_token : false,
