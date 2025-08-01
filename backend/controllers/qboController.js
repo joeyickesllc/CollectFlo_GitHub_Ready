@@ -46,6 +46,14 @@ function generateStateParam() {
 function storeStateInSession(req, state) {
   req.session.qboOAuthState = state;
   req.session.qboOAuthStateTimestamp = Date.now();
+  
+  // Debug logging
+  logger.info('Storing OAuth state in session', {
+    state: state.substring(0, 8) + '...',
+    timestamp: req.session.qboOAuthStateTimestamp,
+    sessionId: req.sessionID,
+    userId: req.user?.id
+  });
 }
 
 /**
@@ -174,7 +182,10 @@ async function handleOAuthCallback(req, res) {
         storedState: req.session.qboOAuthState,
         stateTimestamp: req.session.qboOAuthStateTimestamp,
         currentTime: Date.now(),
-        timeDifference: req.session.qboOAuthStateTimestamp ? Date.now() - req.session.qboOAuthStateTimestamp : 'N/A'
+        timeDifference: req.session.qboOAuthStateTimestamp ? Date.now() - req.session.qboOAuthStateTimestamp : 'N/A',
+        sessionId: req.sessionID,
+        sessionKeys: Object.keys(req.session || {}),
+        hasSession: !!req.session
       });
       return res.redirect(`/${redirectTo}?error=qbo_invalid_state`);
     }
