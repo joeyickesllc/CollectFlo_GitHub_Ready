@@ -489,14 +489,30 @@ async function getCompanyInfo(req, res) {
         }
       });
     } catch (apiError) {
-      // Check if token expired (401 error)
-      if (apiError.response?.status === 401) {
+      const statusCode = apiError.response?.status;
+      const errorData = apiError.response?.data;
+      
+      // Log the detailed API error for debugging
+      logger.error('QBO API error details', {
+        userId,
+        statusCode,
+        errorData,
+        url: `${apiBaseUrl}${tokens.realmId}/companyinfo/${tokens.realmId}`,
+        tokenExists: !!tokens.access_token,
+        realmId: tokens.realmId,
+        environment: secrets.qbo.environment
+      });
+      
+      // Check if token expired (401 error) or authorization failed (403 error)
+      if (statusCode === 401 || statusCode === 403) {
         try {
+          logger.info('Attempting token refresh due to API error', { userId, statusCode });
+          
           // Try to refresh the token
           await refreshAccessToken(userId);
           
           // Return a specific response so client can retry
-          return res.status(401).json({
+          return res.status(statusCode).json({
             success: false,
             message: 'Token refreshed, please retry your request',
             tokenRefreshed: true
@@ -504,7 +520,8 @@ async function getCompanyInfo(req, res) {
         } catch (refreshError) {
           logger.error('QBO token refresh failed during company info fetch', { 
             error: refreshError.message, 
-            userId 
+            userId,
+            originalStatusCode: statusCode
           });
           
           return res.status(401).json({

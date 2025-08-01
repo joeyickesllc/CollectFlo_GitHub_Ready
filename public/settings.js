@@ -90,19 +90,32 @@ async function checkQBOConnection() {
 
     if (response.ok) {
       const data = await response.json();
-      if (data && data.QueryResponse && data.QueryResponse.CompanyInfo && data.QueryResponse.CompanyInfo[0]) {
-        status.innerHTML = `Connected to: ${data.QueryResponse.CompanyInfo[0].CompanyName}`;
+      if (data && data.success && data.company) {
+        status.innerHTML = `Connected to: ${data.company.name}`;
         status.className = 'text-green-600';
       } else {
-        status.innerHTML = 'Connected to QuickBooks (company name not available)';
+        status.innerHTML = 'Connected to QuickBooks';
         status.className = 'text-green-600';
       }
     } else {
       let errorMessage = 'Not connected to QuickBooks';
       try {
         const errorData = await response.json();
-        if (errorData.error) {
-          errorMessage = errorData.error;
+        
+        // Handle token refresh response
+        if (errorData.tokenRefreshed) {
+          status.innerHTML = 'Token refreshed, checking connection...';
+          status.className = 'text-yellow-600';
+          
+          // Retry the request after token refresh
+          setTimeout(() => checkQBOConnection(), 1000);
+          return;
+        }
+        
+        if (errorData.reconnectRequired) {
+          errorMessage = 'QuickBooks connection expired - please reconnect';
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
         }
       } catch (e) {
         // Response is not JSON, use default message
