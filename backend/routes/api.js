@@ -168,8 +168,67 @@ router.get('/dashboard/stats', requireAuth, async (req, res, next) => {
 
 router.get('/invoices', requireAuth, async (req, res, next) => {
   try {
-    // Will be replaced with dashboardController.getInvoices
-    res.status(501).json({ message: 'Not implemented yet' });
+    const userId = req.user.id;
+    const { getValidTokens } = require('../../services/tokenStore');
+    const axios = require('axios');
+    const secrets = require('../config/secrets');
+    
+    // Get QuickBooks tokens
+    const tokens = await getValidTokens(userId);
+    if (!tokens || !tokens.access_token) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'QuickBooks not connected' 
+      });
+    }
+    
+    // Determine API URL
+    const apiBaseUrl = secrets.qbo.environment === 'production'
+      ? 'https://quickbooks.api.intuit.com/v3/company/'
+      : 'https://sandbox-quickbooks.api.intuit.com/v3/company/';
+    
+    try {
+      // Fetch invoices from QuickBooks
+      const response = await axios.get(
+        `${apiBaseUrl}${tokens.realmId}/query?query=SELECT * FROM Invoice MAXRESULTS ${req.query.limit || 50}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${tokens.access_token}`,
+            'Accept': 'application/json'
+          }
+        }
+      );
+      
+      const invoices = response.data.QueryResponse?.Invoice || [];
+      
+      // Transform to match expected format
+      const transformedInvoices = invoices.map(invoice => ({
+        id: invoice.Id,
+        doc_number: invoice.DocNumber,
+        customer_name: invoice.CustomerRef?.name || 'Unknown Customer', 
+        total_amount: invoice.TotalAmt || 0,
+        balance: invoice.Balance || 0,
+        due_date: invoice.DueDate,
+        txn_date: invoice.TxnDate,
+        currency: invoice.CurrencyRef?.value || 'USD',
+        status: invoice.Balance > 0 ? 'unpaid' : 'paid'
+      }));
+      
+      res.json({
+        success: true,
+        invoices: transformedInvoices,
+        count: transformedInvoices.length
+      });
+      
+    } catch (qbError) {
+      console.error('QuickBooks API error:', qbError.response?.data);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch invoices from QuickBooks',
+        error: qbError.response?.data || qbError.message
+      });
+    }
+    
   } catch (error) {
     next(error);
   }
