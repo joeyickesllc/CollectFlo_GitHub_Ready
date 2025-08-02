@@ -359,6 +359,25 @@ if (qboController) {
     requireAuth,
     (req, res, next) => qboController.getCompanyInfo(req, res, next)
   );
+
+  // Debug endpoint to check QuickBooks environment configuration
+  router.get('/qbo/debug-env', requireAuth, async (req, res, next) => {
+    try {
+      const secrets = require('../config/secrets');
+      
+      res.json({
+        qbo_environment: secrets.qbo.environment,
+        qbo_api_url: secrets.qbo.apiUrl,
+        has_client_id: !!secrets.qbo.clientId,
+        has_client_secret: !!secrets.qbo.clientSecret,
+        has_redirect_uri: !!secrets.qbo.redirectUri,
+        node_env: process.env.NODE_ENV,
+        raw_qbo_env: process.env.QBO_ENVIRONMENT
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
 }
 
 /**
