@@ -107,8 +107,15 @@ async function checkQBOConnection() {
           status.innerHTML = 'Token refreshed, checking connection...';
           status.className = 'text-yellow-600';
           
-          // Retry the request after token refresh
-          setTimeout(() => checkQBOConnection(), 1000);
+          // Retry the request after token refresh (but limit retries)
+          if (!window.qboRetryCount) window.qboRetryCount = 0;
+          if (window.qboRetryCount < 3) {
+            window.qboRetryCount++;
+            setTimeout(() => checkQBOConnection(), 2000);
+          } else {
+            status.innerHTML = 'Connection check failed after multiple attempts';
+            status.className = 'text-red-600';
+          }
           return;
         }
         

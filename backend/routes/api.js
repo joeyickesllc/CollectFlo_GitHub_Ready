@@ -190,8 +190,29 @@ router.post('/invoices/:id/exclude', requireAuth, async (req, res, next) => {
  */
 router.get('/settings', requireAuth, async (req, res, next) => {
   try {
-    // Will be replaced with settingsController.getSettings
-    res.status(501).json({ message: 'Not implemented yet' });
+    const userId = req.user.id;
+    
+    // Get company settings from database
+    const companyResult = await db.queryOne(
+      'SELECT name FROM companies WHERE id = (SELECT company_id FROM users WHERE id = $1)',
+      [userId]
+    );
+    
+    // Get user settings from settings table
+    const settingsResult = await db.queryOne(
+      'SELECT * FROM settings WHERE user_id = $1',
+      [userId]
+    );
+    
+    // Default settings if none exist
+    const settings = {
+      company_name: companyResult?.name || '',
+      email: req.user.email || '',
+      phone: settingsResult?.phone || '',
+      reply_to_email: settingsResult?.reply_to_email || ''
+    };
+    
+    res.json(settings);
   } catch (error) {
     next(error);
   }
@@ -199,8 +220,38 @@ router.get('/settings', requireAuth, async (req, res, next) => {
 
 router.post('/settings', requireAuth, async (req, res, next) => {
   try {
-    // Will be replaced with settingsController.updateSettings
-    res.status(501).json({ message: 'Not implemented yet' });
+    const userId = req.user.id;
+    const { company_name, email, phone, reply_to_email } = req.body;
+    
+    // Update company name if provided
+    if (company_name) {
+      await db.query(
+        'UPDATE companies SET name = $1, updated_at = NOW() WHERE id = (SELECT company_id FROM users WHERE id = $2)',
+        [company_name, userId]
+      );
+    }
+    
+    // Update or insert user settings
+    const existingSettings = await db.queryOne(
+      'SELECT id FROM settings WHERE user_id = $1',
+      [userId]
+    );
+    
+    if (existingSettings) {
+      // Update existing settings
+      await db.query(
+        'UPDATE settings SET phone = $1, reply_to_email = $2, updated_at = NOW() WHERE user_id = $3',
+        [phone || null, reply_to_email || null, userId]
+      );
+    } else {
+      // Insert new settings
+      await db.query(
+        'INSERT INTO settings (user_id, phone, reply_to_email, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW())',
+        [userId, phone || null, reply_to_email || null]
+      );
+    }
+    
+    res.json({ success: true, message: 'Settings updated successfully' });
   } catch (error) {
     next(error);
   }
