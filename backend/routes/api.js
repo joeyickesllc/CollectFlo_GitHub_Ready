@@ -201,24 +201,21 @@ router.get('/invoices', requireAuth, async (req, res, next) => {
       
       const invoices = response.data.QueryResponse?.Invoice || [];
       
-      // Transform to match expected format
+      // Transform to match dashboard expected format
       const transformedInvoices = invoices.map(invoice => ({
-        id: invoice.Id,
-        doc_number: invoice.DocNumber,
+        invoice_id: invoice.DocNumber || invoice.Id,
         customer_name: invoice.CustomerRef?.name || 'Unknown Customer', 
-        total_amount: invoice.TotalAmt || 0,
-        balance: invoice.Balance || 0,
+        amount: parseFloat(invoice.TotalAmt || 0),
+        balance: parseFloat(invoice.Balance || 0),
         due_date: invoice.DueDate,
         txn_date: invoice.TxnDate,
-        currency: invoice.CurrencyRef?.value || 'USD',
-        status: invoice.Balance > 0 ? 'unpaid' : 'paid'
+        status: parseFloat(invoice.Balance || 0) > 0 ? 'unpaid' : 'paid',
+        excluded: false, // Default to not excluded
+        next_followup: null // Will be populated later when follow-up system is implemented
       }));
       
-      res.json({
-        success: true,
-        invoices: transformedInvoices,
-        count: transformedInvoices.length
-      });
+      // Return direct array as expected by dashboard
+      res.json(transformedInvoices);
       
     } catch (qbError) {
       console.error('QuickBooks API error:', qbError.response?.data);
