@@ -170,8 +170,24 @@ router.get('/invoices', requireAuth, async (req, res, next) => {
   try {
     const userId = req.user.id;
     const { getValidTokens } = require('../../services/tokenStore');
+    const { createFollowUpsForInvoice, getNextFollowUpDate } = require('../../services/followUpService');
     const axios = require('axios');
     const secrets = require('../config/secrets');
+    
+    // Get user's company ID
+    const userCompany = await db.queryOne(
+      'SELECT company_id FROM users WHERE id = $1',
+      [userId]
+    );
+    
+    if (!userCompany) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'User company not found' 
+      });
+    }
+    
+    const companyId = userCompany.company_id;
     
     // Get QuickBooks tokens
     const tokens = await getValidTokens(userId);
@@ -202,17 +218,37 @@ router.get('/invoices', requireAuth, async (req, res, next) => {
       const invoices = response.data.QueryResponse?.Invoice || [];
       
       // Transform to match dashboard expected format
-      const transformedInvoices = invoices.map(invoice => ({
-        invoice_id: invoice.DocNumber || invoice.Id,
-        customer_name: invoice.CustomerRef?.name || 'Unknown Customer', 
-        amount: parseFloat(invoice.TotalAmt || 0),
-        balance: parseFloat(invoice.Balance || 0),
-        due_date: invoice.DueDate,
-        txn_date: invoice.TxnDate,
-        status: parseFloat(invoice.Balance || 0) > 0 ? 'unpaid' : 'paid',
-        excluded: false, // Default to not excluded
-        next_followup: null // Will be populated later when follow-up system is implemented
-      }));
+      const transformedInvoices = [];
+      
+      for (const invoice of invoices) {
+        const invoiceData = {
+          invoice_id: invoice.DocNumber || invoice.Id,
+          customer_name: invoice.CustomerRef?.name || 'Unknown Customer', 
+          amount: parseFloat(invoice.TotalAmt || 0),
+          balance: parseFloat(invoice.Balance || 0),
+          due_date: invoice.DueDate,
+          txn_date: invoice.TxnDate,
+          status: parseFloat(invoice.Balance || 0) > 0 ? 'unpaid' : 'paid',
+          excluded: false, // Default to not excluded
+          next_followup: null
+        };
+        
+        // Create follow-ups for unpaid invoices
+        if (invoiceData.status === 'unpaid' && invoiceData.due_date) {
+          try {
+            await createFollowUpsForInvoice(invoiceData, companyId);
+            
+            // Get next follow-up date
+            const nextFollowUp = await getNextFollowUpDate(invoiceData.invoice_id, companyId);
+            invoiceData.next_followup = nextFollowUp;
+          } catch (followUpError) {
+            console.error('Error creating follow-ups for invoice:', followUpError.message);
+            // Don't fail the whole request, just log and continue
+          }
+        }
+        
+        transformedInvoices.push(invoiceData);
+      }
       
       // Return direct array as expected by dashboard
       res.json(transformedInvoices);
@@ -435,6 +471,147 @@ if (qboController) {
     }
   });
 }
+
+/**
+ * Follow-Up Management Routes
+ */
+router.get('/follow-ups', requireAuth, async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { getPendingFollowUps } = require('../../services/followUpService');
+    
+    // Get user's company ID
+    const userCompany = await db.queryOne(
+      'SELECT company_id FROM users WHERE id = $1',
+      [userId]
+    );
+    
+    if (!userCompany) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'User company not found' 
+      });
+    }
+    
+    const limit = parseInt(req.query.limit) || 50;
+    const followUps = await getPendingFollowUps(userCompany.company_id, limit);
+    
+    res.json({
+      success: true,
+      follow_ups: followUps,
+      count: followUps.length
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/follow-ups/rules', requireAuth, async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { getFollowUpRules } = require('../../services/followUpService');
+    
+    // Get user's company ID
+    const userCompany = await db.queryOne(
+      'SELECT company_id FROM users WHERE id = $1',
+      [userId]
+    );
+    
+    if (!userCompany) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'User company not found' 
+      });
+    }
+    
+    const rules = await getFollowUpRules(userCompany.company_id);
+    
+    res.json({
+      success: true,
+      rules: rules
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/follow-ups/rules', requireAuth, async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { saveFollowUpRules } = require('../../services/followUpService');
+    const { rules } = req.body;
+    
+    if (!rules || !Array.isArray(rules)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid rules format'
+      });
+    }
+    
+    // Get user's company ID
+    const userCompany = await db.queryOne(
+      'SELECT company_id FROM users WHERE id = $1',
+      [userId]
+    );
+    
+    if (!userCompany) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'User company not found' 
+      });
+    }
+    
+    await saveFollowUpRules(userCompany.company_id, rules);
+    
+    res.json({
+      success: true,
+      message: 'Follow-up rules saved successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/follow-ups/:id/complete', requireAuth, async (req, res, next) => {
+  try {
+    const followUpId = req.params.id;
+    const userId = req.user.id;
+    const { notes } = req.body;
+    
+    // Get user's company ID for security
+    const userCompany = await db.queryOne(
+      'SELECT company_id FROM users WHERE id = $1',
+      [userId]
+    );
+    
+    if (!userCompany) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'User company not found' 
+      });
+    }
+    
+    // Update follow-up status
+    const result = await db.query(
+      'UPDATE follow_ups SET status = $1, delivered_at = NOW(), updated_at = NOW(), error_message = $2 WHERE id = $3 AND company_id = $4',
+      ['completed', notes || null, followUpId, userCompany.company_id]
+    );
+    
+    if (result.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Follow-up not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Follow-up marked as completed'
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 /**
  * Test Routes (for development only)
