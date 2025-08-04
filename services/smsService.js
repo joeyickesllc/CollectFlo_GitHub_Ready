@@ -20,13 +20,13 @@ try {
  * SMS templates for different follow-up types
  */
 const SMS_TEMPLATES = {
-  gentle_reminder: `Hi {{customerName}}, this is a friendly reminder that your invoice {{invoiceNumber}} for ${{amount}} is now {{daysOverdue}} days overdue. Please remit payment at your earliest convenience. Thank you! - {{companyName}}`,
+  gentle_reminder: `Hi {{customerName}}, hope you're well. Just a reminder that invoice {{invoiceNumber}} (${{amount}}) was due {{daysOverdue}} days ago. Please send payment when you get a chance. Thanks! - {{companyName}}`,
   
-  second_reminder: `{{customerName}}, this is your second notice for overdue invoice {{invoiceNumber}} (${{amount}}, {{daysOverdue}} days past due). Please pay immediately to avoid service interruption. Contact us with questions. - {{companyName}}`,
+  second_reminder: `Hi {{customerName}}, following up on invoice {{invoiceNumber}} (${{amount}}) - it's {{daysOverdue}} days past due. I need to get this resolved soon. Can you send payment today? Call me if any issues. - {{companyName}}`,
   
-  firm_reminder: `URGENT: {{customerName}}, invoice {{invoiceNumber}} (${{amount}}) is {{daysOverdue}} days overdue. Payment required within 48 hours to avoid collection action. Call us immediately if paid. - {{companyName}}`,
+  firm_reminder: `{{customerName}}, I haven't received payment for invoice {{invoiceNumber}} (${{amount}}, {{daysOverdue}} days overdue). I need payment in 48 hours to avoid escalation. Please call me today. - {{companyName}}`,
   
-  final_notice: `FINAL NOTICE: {{customerName}}, legal action pending for invoice {{invoiceNumber}} (${{amount}}, {{daysOverdue}} days overdue). Pay within 7 days or face court proceedings. Contact us NOW. - {{companyName}}`
+  final_notice: `{{customerName}}, FINAL NOTICE: Invoice {{invoiceNumber}} (${{amount}}) is {{daysOverdue}} days overdue. I must receive payment in 7 days or turn this over to legal. Please call me now. - {{companyName}}`
 };
 
 /**
@@ -63,16 +63,35 @@ async function getCompanySettings(companyId) {
       [companyId]
     );
     
+    // Try to use company's actual phone number if configured and valid for Twilio
+    const companyPhone = settings?.phone;
+    let fromNumber = secrets.twilio.phoneNumber; // Default fallback
+    
+    // If company has a phone number configured, try to format it for Twilio
+    if (companyPhone) {
+      const formattedCompanyPhone = formatPhoneNumber(companyPhone);
+      if (formattedCompanyPhone) {
+        // In a full implementation, you'd verify this number is configured in Twilio
+        // For now, we'll use it if it looks valid, but fallback to default if sending fails
+        fromNumber = formattedCompanyPhone;
+      }
+    }
+    
     return {
       companyName: company?.name || 'Your Company',
-      phone: settings?.phone || secrets.twilio.phoneNumber,
-      smsEnabled: settings?.sms_enabled || false
+      companyPhone: companyPhone,
+      // Use company's phone number if available, otherwise Twilio default
+      fromNumber: fromNumber,
+      twilioNumber: secrets.twilio.phoneNumber, // Keep as fallback
+      smsEnabled: settings?.sms_enabled !== false // Default to true unless explicitly disabled
     };
   } catch (error) {
     logger.error('Error getting company settings for SMS', { error: error.message, companyId });
     return {
       companyName: 'Your Company',
-      phone: secrets.twilio.phoneNumber,
+      companyPhone: null,
+      fromNumber: secrets.twilio.phoneNumber,
+      twilioNumber: secrets.twilio.phoneNumber,
       smsEnabled: false
     };
   }
@@ -165,11 +184,10 @@ async function sendFollowUpSMS(params) {
       ? message.substring(0, maxLength - 3) + '...'
       : message;
 
-    // For now, we'll log the SMS instead of sending it
-    // In production, uncomment the actual sending code
+    // Use company's phone number as "from" for authenticity
     const smsData = {
       body: finalMessage,
-      from: secrets.twilio.phoneNumber,
+      from: companySettings.fromNumber, // Use company's number if available
       to: toNumber
     };
 
@@ -195,16 +213,60 @@ async function sendFollowUpSMS(params) {
           status: actualStatus
         });
       } catch (sendError) {
-        actualStatus = 'failed';
-        logger.error('Failed to send follow-up SMS', {
-          invoiceId,
-          customerName,
-          templateType,
-          error: sendError.message,
-          to: toNumber,
-          message: finalMessage
-        });
-        throw sendError;
+        // If sending failed with company number, try with default Twilio number as fallback
+        if (smsData.from !== companySettings.twilioNumber && companySettings.twilioNumber) {
+          logger.warn('SMS failed with company number, retrying with Twilio number', {
+            invoiceId,
+            originalFrom: smsData.from,
+            fallbackFrom: companySettings.twilioNumber,
+            error: sendError.message
+          });
+          
+          try {
+            const fallbackSmsData = {
+              ...smsData,
+              from: companySettings.twilioNumber
+            };
+            
+            sendResult = await twilioClient.messages.create(fallbackSmsData);
+            actualStatus = sendResult.status || 'sent';
+            actualMessageId = sendResult.sid;
+            
+            logger.info('Follow-up SMS sent successfully with fallback number', {
+              invoiceId,
+              customerName,
+              templateType,
+              message: finalMessage,
+              to: toNumber,
+              from: fallbackSmsData.from,
+              messageId: actualMessageId,
+              status: actualStatus
+            });
+          } catch (fallbackError) {
+            actualStatus = 'failed';
+            logger.error('Failed to send follow-up SMS even with fallback', {
+              invoiceId,
+              customerName,
+              templateType,
+              originalError: sendError.message,
+              fallbackError: fallbackError.message,
+              to: toNumber,
+              message: finalMessage
+            });
+            throw fallbackError;
+          }
+        } else {
+          actualStatus = 'failed';
+          logger.error('Failed to send follow-up SMS', {
+            invoiceId,
+            customerName,
+            templateType,
+            error: sendError.message,
+            to: toNumber,
+            message: finalMessage
+          });
+          throw sendError;
+        }
       }
     } else {
       // Log when no customer phone is available

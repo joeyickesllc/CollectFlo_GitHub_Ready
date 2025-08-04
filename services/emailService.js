@@ -16,147 +16,117 @@ sgMail.setApiKey(secrets.sendgrid.apiKey);
  */
 const EMAIL_TEMPLATES = {
   gentle_reminder: {
-    subject: 'Friendly Reminder: Invoice {{invoiceNumber}} Due',
+    subject: 'Invoice {{invoiceNumber}} - Payment Due',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #333;">Payment Reminder</h2>
-        <p>Dear {{customerName}},</p>
-        <p>We hope this message finds you well. This is a friendly reminder that your invoice payment is now due.</p>
+        <p>Hi {{customerName}},</p>
+        
+        <p>I hope you're doing well. I wanted to reach out regarding invoice {{invoiceNumber}} which was due on {{dueDate}}.</p>
         
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
-          <h3 style="margin-top: 0; color: #495057;">Invoice Details</h3>
-          <p><strong>Invoice Number:</strong> {{invoiceNumber}}</p>
+          <p><strong>Invoice #{{invoiceNumber}}</strong></p>
           <p><strong>Amount Due:</strong> ${{amount}}</p>
           <p><strong>Due Date:</strong> {{dueDate}}</p>
-          <p><strong>Days Overdue:</strong> {{daysOverdue}} days</p>
         </div>
         
-        <p>We understand that sometimes invoices can be overlooked, so we wanted to bring this to your attention.</p>
+        <p>I know things can get busy, so I just wanted to make sure this didn't slip through the cracks. If you've already sent the payment, please disregard this message.</p>
         
-        <p>If you have any questions about this invoice or need to discuss payment arrangements, please don't hesitate to contact us.</p>
+        <p>If you have any questions or need to discuss payment arrangements, just hit reply or give me a call. I'm here to help.</p>
         
-        <p>Thank you for your prompt attention to this matter.</p>
+        <p>Thanks so much!</p>
         
-        <p>Best regards,<br>{{companyName}}</p>
-        
-        <hr style="margin: 30px 0; border: none; border-top: 1px solid #dee2e6;">
-        <p style="font-size: 12px; color: #6c757d;">
-          This is an automated reminder. If you have already made this payment, please disregard this message.
-        </p>
+        <p>{{companyName}}</p>
       </div>
     `
   },
   
   second_reminder: {
-    subject: 'Second Notice: Invoice {{invoiceNumber}} Payment Required',
+    subject: 'Re: Invoice {{invoiceNumber}} - Past Due',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #dc3545;">Payment Notice</h2>
-        <p>Dear {{customerName}},</p>
-        <p>This is our second notice regarding the overdue payment for the invoice below.</p>
+        <p>Hi {{customerName}},</p>
+        
+        <p>I'm following up on my previous email about invoice {{invoiceNumber}}. The payment is now {{daysOverdue}} days past due and I haven't received payment or heard back from you.</p>
         
         <div style="background-color: #fff3cd; padding: 20px; border-left: 4px solid #ffc107; margin: 20px 0;">
-          <h3 style="margin-top: 0; color: #856404;">Invoice Details</h3>
-          <p><strong>Invoice Number:</strong> {{invoiceNumber}}</p>
+          <p><strong>Invoice #{{invoiceNumber}}</strong></p>
           <p><strong>Amount Due:</strong> ${{amount}}</p>
           <p><strong>Original Due Date:</strong> {{dueDate}}</p>
-          <p><strong>Days Overdue:</strong> {{daysOverdue}} days</p>
+          <p><strong>Days Past Due:</strong> {{daysOverdue}} days</p>
         </div>
         
-        <p><strong>Please remit payment immediately to avoid any service interruption or additional fees.</strong></p>
+        <p>I need to get this resolved quickly to keep your account in good standing. Please send payment today or give me a call to discuss payment arrangements.</p>
         
-        <p>If you have already sent payment, please contact us immediately so we can update our records.</p>
+        <p>If you've already sent payment, please let me know so I can check on it.</p>
         
-        <p>If you're experiencing financial difficulties, please contact us to discuss payment arrangements.</p>
+        <p>I appreciate your prompt attention to this.</p>
         
-        <p>We appreciate your immediate attention to this matter.</p>
-        
-        <p>Sincerely,<br>{{companyName}} Accounts Receivable</p>
-        
-        <hr style="margin: 30px 0; border: none; border-top: 1px solid #dee2e6;">
-        <p style="font-size: 12px; color: #6c757d;">
-          This is an automated notice. Please contact us if you have any questions.
-        </p>
+        <p>{{companyName}}</p>
       </div>
     `
   },
   
   firm_reminder: {
-    subject: 'URGENT: Invoice {{invoiceNumber}} - Payment Required',
+    subject: 'URGENT: Invoice {{invoiceNumber}} - Immediate Action Required',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #dc3545;">URGENT: Payment Required</h2>
-        <p>Dear {{customerName}},</p>
-        <p>Your account is now seriously overdue. <strong>Immediate payment is required</strong> for the invoice detailed below.</p>
+        <p>{{customerName}},</p>
+        
+        <p>I've sent multiple emails about invoice {{invoiceNumber}} and haven't received payment or any response. This is now seriously overdue and requires immediate attention.</p>
         
         <div style="background-color: #f8d7da; padding: 20px; border-left: 4px solid #dc3545; margin: 20px 0;">
-          <h3 style="margin-top: 0; color: #721c24;">OVERDUE INVOICE</h3>
-          <p><strong>Invoice Number:</strong> {{invoiceNumber}}</p>
+          <p><strong>Invoice #{{invoiceNumber}}</strong></p>
           <p><strong>Amount Due:</strong> ${{amount}}</p>
-          <p><strong>Original Due Date:</strong> {{dueDate}}</p>
-          <p><strong>Days Overdue:</strong> {{daysOverdue}} days</p>
+          <p><strong>Due Date:</strong> {{dueDate}}</p>
+          <p><strong>Days Past Due:</strong> {{daysOverdue}} days</p>
         </div>
         
-        <p><strong>ACTION REQUIRED:</strong> Please remit payment within 48 hours to avoid collection action.</p>
+        <p><strong>I need payment within 48 hours to avoid escalating this matter.</strong></p>
         
-        <p>If payment has been made, please provide proof of payment immediately.</p>
+        <p>If you've already sent payment, please send me confirmation immediately so I can locate it.</p>
         
-        <p>Failure to respond to this notice may result in:</p>
-        <ul>
-          <li>Suspension of service</li>
-          <li>Additional collection fees</li>
-          <li>Referral to a collection agency</li>
-          <li>Impact on your credit rating</li>
-        </ul>
+        <p>If there's a problem with the invoice or you need to work out payment arrangements, call me right away. I want to resolve this, but I need to hear from you.</p>
         
-        <p>Contact us immediately at [PHONE] or reply to this email to resolve this matter.</p>
+        <p>Please don't ignore this - continued non-payment may result in service suspension and additional collection costs.</p>
         
-        <p>{{companyName}} Collections Department</p>
+        <p>Call me today.</p>
         
-        <hr style="margin: 30px 0; border: none; border-top: 1px solid #dee2e6;">
-        <p style="font-size: 12px; color: #6c757d;">
-          This is a formal collection notice. Please treat this matter with urgency.
-        </p>
+        <p>{{companyName}}</p>
       </div>
     `
   },
   
   final_notice: {
-    subject: 'FINAL NOTICE: Invoice {{invoiceNumber}} - Legal Action Pending',
+    subject: 'FINAL NOTICE: Invoice {{invoiceNumber}} - Action Required',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #dc3545; text-transform: uppercase;">Final Notice - Legal Action Pending</h2>
-        <p>Dear {{customerName}},</p>
-        <p><strong>This is your FINAL NOTICE</strong> before we pursue legal remedies for the collection of the overdue amount below.</p>
+        <p>{{customerName}},</p>
+        
+        <p><strong>This is my final attempt to collect payment before taking further action.</strong></p>
+        
+        <p>Invoice {{invoiceNumber}} is now {{daysOverdue}} days past due and I have not received payment despite multiple requests.</p>
         
         <div style="background-color: #f8d7da; padding: 20px; border: 2px solid #dc3545; margin: 20px 0;">
-          <h3 style="margin-top: 0; color: #721c24; text-transform: uppercase;">Final Demand</h3>
-          <p><strong>Invoice Number:</strong> {{invoiceNumber}}</p>
+          <p><strong style="color: #721c24;">FINAL DEMAND</strong></p>
+          <p><strong>Invoice #{{invoiceNumber}}</strong></p>
           <p><strong>Amount Due:</strong> ${{amount}}</p>
-          <p><strong>Original Due Date:</strong> {{dueDate}}</p>
-          <p><strong>Days Overdue:</strong> {{daysOverdue}} days</p>
+          <p><strong>Due Date:</strong> {{dueDate}}</p>
+          <p><strong>Days Past Due:</strong> {{daysOverdue}} days</p>
         </div>
         
-        <p><strong>YOU HAVE 7 DAYS FROM THE DATE OF THIS NOTICE TO PAY THE FULL AMOUNT DUE.</strong></p>
+        <p><strong>You have 7 days to pay the full amount or contact me to resolve this.</strong></p>
         
-        <p>If payment is not received within this time frame, we will:</p>
+        <p>If I don't receive payment or hear from you within 7 days, I will have no choice but to:</p>
         <ul>
-          <li>Refer your account to our legal department</li>
+          <li>Turn this over to our legal department</li>
+          <li>Report the delinquency to credit agencies</li>
           <li>Pursue collection through the courts</li>
-          <li>Report delinquency to credit agencies</li>
-          <li>Seek recovery of collection costs and legal fees</li>
+          <li>Add collection costs and legal fees to your balance</li>
         </ul>
         
-        <p>This may negatively impact your credit score and result in additional costs.</p>
+        <p>I don't want it to come to this. Please call me immediately to avoid legal action.</p>
         
-        <p><strong>TO AVOID LEGAL ACTION:</strong> Contact us immediately at [PHONE] or respond to this email.</p>
-        
-        <p>{{companyName}} Legal Department</p>
-        
-        <hr style="margin: 30px 0; border: none; border-top: 1px solid #dee2e6;">
-        <p style="font-size: 12px; color: #6c757d;">
-          This is a legal notice. Failure to respond may result in legal proceedings without further notice.
-        </p>
+        <p>{{companyName}}</p>
       </div>
     `
   }
@@ -191,26 +161,38 @@ async function getCompanySettings(companyId) {
       [companyId]
     );
     
+    // Get user and settings for this company
+    const user = await db.queryOne(
+      'SELECT email FROM users WHERE company_id = $1 ORDER BY id LIMIT 1',
+      [companyId]
+    );
+    
     const settings = await db.queryOne(
       'SELECT * FROM settings WHERE user_id = (SELECT id FROM users WHERE company_id = $1 LIMIT 1)',
       [companyId]
     );
     
+    // Use company's actual email and phone as "from" information
+    const companyEmail = settings?.reply_to_email || user?.email;
+    const companyPhone = settings?.phone;
+    const companyName = company?.name || 'Your Company';
+    
     return {
-      companyName: company?.name || 'Your Company',
-      phone: settings?.phone || '[PHONE]',
-      replyToEmail: settings?.reply_to_email || secrets.sendgrid.fromEmail,
-      fromEmail: secrets.sendgrid.fromEmail,
-      fromName: company?.name || secrets.sendgrid.fromName
+      companyName: companyName,
+      phone: companyPhone || '[PHONE]',
+      // Use company's actual email as from address for authenticity
+      fromEmail: companyEmail || secrets.sendgrid.fromEmail,
+      fromName: companyName,
+      replyToEmail: companyEmail || secrets.sendgrid.fromEmail
     };
   } catch (error) {
     logger.error('Error getting company settings', { error: error.message, companyId });
     return {
       companyName: 'Your Company',
       phone: '[PHONE]',
-      replyToEmail: secrets.sendgrid.fromEmail,
       fromEmail: secrets.sendgrid.fromEmail,
-      fromName: secrets.sendgrid.fromName
+      fromName: secrets.sendgrid.fromName,
+      replyToEmail: secrets.sendgrid.fromEmail
     };
   }
 }
