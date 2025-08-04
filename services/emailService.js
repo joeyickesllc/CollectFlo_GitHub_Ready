@@ -270,25 +270,54 @@ async function sendFollowUpEmail(params) {
       html: html
     };
 
-    // TODO: Uncomment when customer email is available
-    // await sgMail.send(emailData);
+    // Send the email via SendGrid
+    let sendResult;
+    let actualStatus = 'prepared';
+    let actualMessageId = 'no-email-' + Date.now();
 
-    // For now, just log the email
-    logger.info('Follow-up email prepared', {
-      invoiceId,
-      customerName,
-      templateType,
-      subject: subject,
-      to: emailData.to
-    });
+    if (customerEmail && customerEmail !== 'customer@example.com') {
+      try {
+        sendResult = await sgMail.send(emailData);
+        actualStatus = 'sent';
+        actualMessageId = sendResult[0].headers['x-message-id'] || sendResult[0].messageId || 'sent-' + Date.now();
+        
+        logger.info('Follow-up email sent successfully', {
+          invoiceId,
+          customerName,
+          templateType,
+          subject: subject,
+          to: emailData.to,
+          messageId: actualMessageId
+        });
+      } catch (sendError) {
+        actualStatus = 'failed';
+        logger.error('Failed to send follow-up email', {
+          invoiceId,
+          customerName,
+          templateType,
+          error: sendError.message,
+          to: emailData.to
+        });
+        throw sendError;
+      }
+    } else {
+      // Log when no customer email is available
+      logger.warn('Follow-up email prepared but not sent - no customer email available', {
+        invoiceId,
+        customerName,
+        templateType,
+        subject: subject
+      });
+    }
 
     return {
       method: 'email',
-      status: 'sent', // Would be 'sent' after actual sending
+      status: actualStatus,
       templateType,
       subject,
       recipient: emailData.to,
-      messageId: 'simulated-' + Date.now() // Would be actual message ID from SendGrid
+      messageId: actualMessageId,
+      sendResult: sendResult ? 'success' : 'no-email-available'
     };
 
   } catch (error) {

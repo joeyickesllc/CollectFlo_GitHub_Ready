@@ -110,12 +110,53 @@ async function processFollowUp(followUp) {
       throw new Error('Could not fetch invoice details from QuickBooks');
     }
 
+    // Get customer contact information
+    let customerEmail = null;
+    let customerPhone = null;
+    
+    if (invoice.CustomerRef?.value) {
+      try {
+        // Get QuickBooks tokens
+        const tokens = await getValidTokens(user.id);
+        if (tokens?.access_token) {
+          const apiBaseUrl = secrets.qbo.environment === 'production'
+            ? 'https://quickbooks.api.intuit.com/v3/company/'
+            : 'https://sandbox-quickbooks.api.intuit.com/v3/company/';
+
+          // Fetch customer details
+          const customerResponse = await axios.get(
+            `${apiBaseUrl}${tokens.realmId}/customer/${invoice.CustomerRef.value}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${tokens.access_token}`,
+                'Accept': 'application/json'
+              }
+            }
+          );
+
+          const customer = customerResponse.data.QueryResponse?.Customer?.[0];
+          if (customer) {
+            customerEmail = customer.PrimaryEmailAddr?.Address;
+            customerPhone = customer.PrimaryPhone?.FreeFormNumber || customer.Mobile?.FreeFormNumber;
+          }
+        }
+      } catch (customerError) {
+        logger.warn('Could not fetch customer contact details', {
+          error: customerError.message,
+          customerId: invoice.CustomerRef.value,
+          invoiceId: followUp.invoice_id
+        });
+      }
+    }
+
     // Prepare follow-up context
     const context = {
       invoice: {
         id: followUp.invoice_id,
         docNumber: invoice.DocNumber || followUp.invoice_id,
         customerName: invoice.CustomerRef?.name || 'Valued Customer',
+        customerEmail: customerEmail,
+        customerPhone: customerPhone,
         totalAmount: parseFloat(invoice.TotalAmt || 0),
         balance: parseFloat(invoice.Balance || 0),
         dueDate: invoice.DueDate,
@@ -208,6 +249,7 @@ async function sendEmailFollowUp(context) {
   return await emailService.sendFollowUpEmail({
     invoiceId: context.invoice.id,
     customerName: context.invoice.customerName,
+    customerEmail: context.invoice.customerEmail,
     amount: context.invoice.balance,
     dueDate: context.invoice.dueDate,
     daysOverdue: context.invoice.daysOverdue,
@@ -227,6 +269,7 @@ async function sendSMSFollowUp(context) {
   return await smsService.sendFollowUpSMS({
     invoiceId: context.invoice.id,
     customerName: context.invoice.customerName,
+    customerPhone: context.invoice.customerPhone,
     amount: context.invoice.balance,
     daysOverdue: context.invoice.daysOverdue,
     companyId: context.company.id

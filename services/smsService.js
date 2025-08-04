@@ -173,27 +173,58 @@ async function sendFollowUpSMS(params) {
       to: toNumber
     };
 
-    // TODO: Uncomment when ready to send actual SMS
-    // const result = await twilioClient.messages.create(smsData);
+    // Send the SMS via Twilio
+    let sendResult;
+    let actualStatus = 'prepared';
+    let actualMessageId = 'no-phone-' + Date.now();
 
-    // For now, just log the SMS
-    logger.info('Follow-up SMS prepared', {
-      invoiceId,
-      customerName,
-      templateType,
-      message: finalMessage,
-      to: toNumber,
-      from: smsData.from
-    });
+    if (customerPhone && toNumber) {
+      try {
+        sendResult = await twilioClient.messages.create(smsData);
+        actualStatus = sendResult.status || 'sent';
+        actualMessageId = sendResult.sid;
+        
+        logger.info('Follow-up SMS sent successfully', {
+          invoiceId,
+          customerName,
+          templateType,
+          message: finalMessage,
+          to: toNumber,
+          from: smsData.from,
+          messageId: actualMessageId,
+          status: actualStatus
+        });
+      } catch (sendError) {
+        actualStatus = 'failed';
+        logger.error('Failed to send follow-up SMS', {
+          invoiceId,
+          customerName,
+          templateType,
+          error: sendError.message,
+          to: toNumber,
+          message: finalMessage
+        });
+        throw sendError;
+      }
+    } else {
+      // Log when no customer phone is available
+      logger.warn('Follow-up SMS prepared but not sent - no customer phone available', {
+        invoiceId,
+        customerName,
+        templateType,
+        message: finalMessage
+      });
+    }
 
     return {
       method: 'sms',
-      status: 'sent', // Would be result.status after actual sending
+      status: actualStatus,
       templateType,
       message: finalMessage,
       recipient: toNumber,
-      messageId: 'simulated-' + Date.now(), // Would be result.sid from Twilio
-      characterCount: finalMessage.length
+      messageId: actualMessageId,
+      characterCount: finalMessage.length,
+      sendResult: sendResult ? 'success' : 'no-phone-available'
     };
 
   } catch (error) {
