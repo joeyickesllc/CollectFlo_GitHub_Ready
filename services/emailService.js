@@ -15,6 +15,68 @@ sgMail.setApiKey(secrets.sendgrid.apiKey);
  * Email templates for different follow-up types
  */
 const EMAIL_TEMPLATES = {
+  pre_due_reminder: {
+    subject: 'Invoice {{invoiceNumber}} - Due Tomorrow',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <p>Hi {{customerName}},</p>
+        
+        <p>I hope you're having a great day. I wanted to give you a friendly heads up that invoice {{invoiceNumber}} is due tomorrow ({{dueDate}}).</p>
+        
+        <div style="background-color: #e3f2fd; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #2196f3;">
+          <p><strong>Invoice #{{invoiceNumber}}</strong></p>
+          <p><strong>Amount Due:</strong> ${{amount}}</p>
+          <p><strong>Due Date:</strong> {{dueDate}}</p>
+        </div>
+        
+        <p>Just a quick reminder to help you stay on top of things. If you've already scheduled the payment, you can disregard this message.</p>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="{{paymentLink}}" style="background-color: #2196f3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+            💳 Pay Invoice Online
+          </a>
+        </div>
+        
+        <p>You can easily pay online using the button above. If you have any questions or need to discuss anything, just reply to this email or give me a call.</p>
+        
+        <p>Thanks for being a valued customer!</p>
+        
+        <p>{{companyName}}</p>
+      </div>
+    `
+  },
+  
+  due_date_notice: {
+    subject: 'Invoice {{invoiceNumber}} - Due Today',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <p>Hi {{customerName}},</p>
+        
+        <p>I wanted to reach out because invoice {{invoiceNumber}} is due today ({{dueDate}}).</p>
+        
+        <div style="background-color: #fff3e0; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ff9800;">
+          <p><strong>Invoice #{{invoiceNumber}}</strong></p>
+          <p><strong>Amount Due:</strong> ${{amount}}</p>
+          <p><strong>Due Date:</strong> {{dueDate}} (Today)</p>
+        </div>
+        
+        <p>If you've already sent the payment, please disregard this message. If not, you can pay quickly and securely online.</p>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="{{paymentLink}}" style="background-color: #ff9800; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+            💳 Pay Invoice Today
+          </a>
+        </div>
+        
+        <p>You can pay online using the button above. If you need to discuss payment arrangements or have any questions, please reply to this email or give me a call.</p>
+        
+        <p>Thank you!</p>
+        
+        <p>{{companyName}}</p>
+      </div>
+    `
+  },
+  
   gentle_reminder: {
     subject: 'Invoice {{invoiceNumber}} - Payment Due',
     html: `
@@ -31,7 +93,13 @@ const EMAIL_TEMPLATES = {
         
         <p>I know things can get busy, so I just wanted to make sure this didn't slip through the cracks. If you've already sent the payment, please disregard this message.</p>
         
-        <p>If you have any questions or need to discuss payment arrangements, just hit reply or give me a call. I'm here to help.</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="{{paymentLink}}" style="background-color: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+            💳 Pay Invoice Online
+          </a>
+        </div>
+        
+        <p>You can pay securely online using the button above, or if you have any questions or need to discuss payment arrangements, just hit reply or give me a call. I'm here to help.</p>
         
         <p>Thanks so much!</p>
         
@@ -57,7 +125,13 @@ const EMAIL_TEMPLATES = {
         
         <p>I need to get this resolved quickly to keep your account in good standing. Please send payment today or give me a call to discuss payment arrangements.</p>
         
-        <p>If you've already sent payment, please let me know so I can check on it.</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="{{paymentLink}}" style="background-color: #FF9800; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+            💳 Pay Now - Keep Account Current
+          </a>
+        </div>
+        
+        <p>You can pay immediately using the button above. If you've already sent payment, please let me know so I can check on it.</p>
         
         <p>I appreciate your prompt attention to this.</p>
         
@@ -85,11 +159,57 @@ const EMAIL_TEMPLATES = {
         
         <p>If you've already sent payment, please send me confirmation immediately so I can locate it.</p>
         
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="{{paymentLink}}" style="background-color: #f44336; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; font-size: 16px;">
+            🚨 PAY NOW - AVOID ESCALATION
+          </a>
+        </div>
+        
         <p>If there's a problem with the invoice or you need to work out payment arrangements, call me right away. I want to resolve this, but I need to hear from you.</p>
         
         <p>Please don't ignore this - continued non-payment may result in service suspension and additional collection costs.</p>
         
         <p>Call me today.</p>
+        
+        <p>{{companyName}}</p>
+      </div>
+    `
+  },
+  
+  fourth_reminder: {
+    subject: 'CRITICAL: Invoice {{invoiceNumber}} - Account in Jeopardy',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <p>{{customerName}},</p>
+        
+        <p><strong>Your account is now in serious jeopardy.</strong> Invoice {{invoiceNumber}} has been outstanding for {{daysOverdue}} days and I have not received payment despite multiple attempts to contact you.</p>
+        
+        <div style="background-color: #ffebee; padding: 20px; border: 2px solid #d32f2f; margin: 20px 0; border-radius: 5px;">
+          <p style="color: #d32f2f; font-weight: bold; margin: 0 0 10px 0;">⚠️ ACCOUNT STATUS: CRITICAL</p>
+          <p><strong>Invoice #{{invoiceNumber}}</strong></p>
+          <p><strong>Amount Due:</strong> ${{amount}}</p>
+          <p><strong>Due Date:</strong> {{dueDate}}</p>
+          <p><strong>Days Past Due:</strong> {{daysOverdue}} days</p>
+        </div>
+        
+        <p><strong>This is your last opportunity to resolve this before I escalate to our legal department and credit reporting agencies.</strong></p>
+        
+        <div style="text-align: center; margin: 30px 0; background-color: #ffcdd2; padding: 20px; border-radius: 5px;">
+          <p style="margin: 0 0 15px 0; font-weight: bold; color: #b71c1c;">🚨 FINAL WARNING - IMMEDIATE ACTION REQUIRED 🚨</p>
+          <a href="{{paymentLink}}" style="background-color: #b71c1c; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; font-size: 16px;">
+            💳 PAY NOW - PREVENT LEGAL ACTION
+          </a>
+        </div>
+        
+        <p><strong>If I don't receive payment within 7 days, I will have no choice but to:</strong></p>
+        <ul style="color: #d32f2f; font-weight: bold;">
+          <li>Report this delinquency to credit bureaus</li>
+          <li>Turn your account over to our legal department</li>
+          <li>Suspend all services immediately</li>
+          <li>Add collection fees and legal costs to your balance</li>
+        </ul>
+        
+        <p>I don't want it to come to this. Please pay online immediately or call me to arrange payment today.</p>
         
         <p>{{companyName}}</p>
       </div>
@@ -114,6 +234,13 @@ const EMAIL_TEMPLATES = {
           <p><strong>Days Past Due:</strong> {{daysOverdue}} days</p>
         </div>
         
+        <div style="text-align: center; margin: 30px 0; background-color: #ffebee; padding: 20px; border-radius: 5px;">
+          <p style="margin: 0 0 15px 0; font-weight: bold; color: #d32f2f;">⚠️ FINAL OPPORTUNITY TO PAY ONLINE ⚠️</p>
+          <a href="{{paymentLink}}" style="background-color: #d32f2f; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; font-size: 16px;">
+            💳 PAY NOW - AVOID LEGAL ACTION
+          </a>
+        </div>
+        
         <p><strong>You have 7 days to pay the full amount or contact me to resolve this.</strong></p>
         
         <p>If I don't receive payment or hear from you within 7 days, I will have no choice but to:</p>
@@ -124,7 +251,7 @@ const EMAIL_TEMPLATES = {
           <li>Add collection costs and legal fees to your balance</li>
         </ul>
         
-        <p>I don't want it to come to this. Please call me immediately to avoid legal action.</p>
+        <p>I don't want it to come to this. Please pay online using the button above or call me immediately to avoid legal action.</p>
         
         <p>{{companyName}}</p>
       </div>
@@ -211,7 +338,8 @@ async function sendFollowUpEmail(params) {
     daysOverdue,
     templateType = 'gentle_reminder',
     companyId,
-    customerEmail
+    customerEmail,
+    paymentLink
   } = params;
 
   try {
@@ -231,7 +359,8 @@ async function sendFollowUpEmail(params) {
       amount: parseFloat(amount || 0).toFixed(2),
       dueDate: dueDate ? new Date(dueDate).toLocaleDateString() : 'N/A',
       daysOverdue: daysOverdue || 0,
-      companyName: companySettings.companyName
+      companyName: companySettings.companyName,
+      paymentLink: paymentLink || '#payment-not-available'
     };
 
     // Process templates
@@ -329,7 +458,8 @@ async function sendTestFollowUpEmail(toEmail, testData = {}) {
     daysOverdue: testData.daysOverdue || 5,
     templateType: testData.templateType || 'gentle_reminder',
     companyId: testData.companyId || 1,
-    customerEmail: toEmail
+    customerEmail: toEmail,
+    paymentLink: testData.paymentLink || 'https://example.com/pay/test-123'
   };
 
   return await sendFollowUpEmail(testParams);

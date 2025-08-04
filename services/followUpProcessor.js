@@ -110,6 +110,21 @@ async function processFollowUp(followUp) {
       throw new Error('Could not fetch invoice details from QuickBooks');
     }
 
+    // Generate payment link
+    let paymentLink = null;
+    try {
+      const { generateQuickBooksPaymentLink } = require('./paymentLinkService');
+      const paymentLinkData = await generateQuickBooksPaymentLink(followUp.invoice_id, user.id);
+      paymentLink = paymentLinkData.paymentUrl;
+    } catch (paymentError) {
+      logger.warn('Could not generate payment link', {
+        error: paymentError.message,
+        invoiceId: followUp.invoice_id,
+        userId: user.id
+      });
+      // Continue without payment link - don't fail the whole follow-up
+    }
+
     // Get customer contact information
     let customerEmail = null;
     let customerPhone = null;
@@ -161,7 +176,8 @@ async function processFollowUp(followUp) {
         balance: parseFloat(invoice.Balance || 0),
         dueDate: invoice.DueDate,
         txnDate: invoice.TxnDate,
-        daysOverdue: calculateDaysOverdue(invoice.DueDate)
+        daysOverdue: calculateDaysOverdue(invoice.DueDate),
+        paymentLink: paymentLink
       },
       followUp: {
         type: followUp.follow_up_type,
@@ -238,12 +254,20 @@ async function sendEmailFollowUp(context) {
   
   // Determine email template based on days overdue
   let templateType = 'gentle_reminder';
-  if (context.invoice.daysOverdue >= 21) {
+  if (context.invoice.daysOverdue < 0) {
+    templateType = 'pre_due_reminder';
+  } else if (context.invoice.daysOverdue === 0) {
+    templateType = 'due_date_notice';
+  } else if (context.invoice.daysOverdue >= 28) {
     templateType = 'final_notice';
+  } else if (context.invoice.daysOverdue >= 21) {
+    templateType = 'fourth_reminder';
   } else if (context.invoice.daysOverdue >= 14) {
     templateType = 'firm_reminder';
-  } else if (context.invoice.daysOverdue >= 7) {
+  } else if (context.invoice.daysOverdue >= 10) {
     templateType = 'second_reminder';
+  } else if (context.invoice.daysOverdue >= 7) {
+    templateType = 'gentle_reminder';
   }
 
   return await emailService.sendFollowUpEmail({
@@ -254,7 +278,8 @@ async function sendEmailFollowUp(context) {
     dueDate: context.invoice.dueDate,
     daysOverdue: context.invoice.daysOverdue,
     templateType: templateType,
-    companyId: context.company.id
+    companyId: context.company.id,
+    paymentLink: context.invoice.paymentLink
   });
 }
 
@@ -266,13 +291,34 @@ async function sendEmailFollowUp(context) {
 async function sendSMSFollowUp(context) {
   const smsService = require('./smsService');
   
+  // Determine SMS template based on days overdue
+  let templateType = 'gentle_reminder';
+  if (context.invoice.daysOverdue < 0) {
+    templateType = 'pre_due_reminder';
+  } else if (context.invoice.daysOverdue === 0) {
+    templateType = 'due_date_notice';
+  } else if (context.invoice.daysOverdue >= 28) {
+    templateType = 'final_notice';
+  } else if (context.invoice.daysOverdue >= 21) {
+    templateType = 'fourth_reminder';
+  } else if (context.invoice.daysOverdue >= 14) {
+    templateType = 'firm_reminder';
+  } else if (context.invoice.daysOverdue >= 10) {
+    templateType = 'second_reminder';
+  } else if (context.invoice.daysOverdue >= 7) {
+    templateType = 'gentle_reminder';
+  }
+  
   return await smsService.sendFollowUpSMS({
     invoiceId: context.invoice.id,
     customerName: context.invoice.customerName,
     customerPhone: context.invoice.customerPhone,
     amount: context.invoice.balance,
     daysOverdue: context.invoice.daysOverdue,
-    companyId: context.company.id
+    dueDate: context.invoice.dueDate,
+    templateType: templateType,
+    companyId: context.company.id,
+    paymentLink: context.invoice.paymentLink
   });
 }
 
@@ -380,7 +426,7 @@ function calculateDaysOverdue(dueDate) {
   const diffTime = today - due;
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   
-  return Math.max(0, diffDays);
+  return diffDays;
 }
 
 module.exports = {

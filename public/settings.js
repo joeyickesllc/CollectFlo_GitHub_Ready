@@ -146,6 +146,42 @@ document.getElementById('reconnectQboBtn').addEventListener('click', reconnectQB
 
 // Default follow-up templates
 const DEFAULT_EMAIL_TEMPLATES = {
+  pre_due_reminder: {
+    subject: 'Invoice {{invoiceNumber}} - Due Tomorrow',
+    body: `Hi {{customerName}},
+
+I hope you're having a great day. I wanted to give you a friendly heads up that invoice {{invoiceNumber}} is due tomorrow ({{dueDate}}).
+
+Invoice #{{invoiceNumber}}
+Amount Due: ${{amount}}
+Due Date: {{dueDate}}
+
+Just a quick reminder to help you stay on top of things. If you've already scheduled the payment, you can disregard this message.
+
+You can easily pay online or if you have any questions or need to discuss anything, just reply to this email or give me a call.
+
+Thanks for being a valued customer!
+
+{{companyName}}`
+  },
+  due_date_notice: {
+    subject: 'Invoice {{invoiceNumber}} - Due Today',
+    body: `Hi {{customerName}},
+
+I wanted to reach out because invoice {{invoiceNumber}} is due today ({{dueDate}}).
+
+Invoice #{{invoiceNumber}}
+Amount Due: ${{amount}}
+Due Date: {{dueDate}} (Today)
+
+If you've already sent the payment, please disregard this message. If not, you can pay quickly and securely online.
+
+If you need to discuss payment arrangements or have any questions, please reply to this email or give me a call.
+
+Thank you!
+
+{{companyName}}`
+  },
   gentle_reminder: {
     subject: 'Invoice {{invoiceNumber}} - Payment Due',
     body: `Hi {{customerName}},
@@ -206,6 +242,30 @@ Call me today.
 
 {{companyName}}`
   },
+  fourth_reminder: {
+    subject: 'CRITICAL: Invoice {{invoiceNumber}} - Account in Jeopardy',
+    body: `{{customerName}},
+
+Your account is now in serious jeopardy. Invoice {{invoiceNumber}} has been outstanding for {{daysOverdue}} days and I have not received payment despite multiple attempts to contact you.
+
+ACCOUNT STATUS: CRITICAL
+Invoice #{{invoiceNumber}}
+Amount Due: ${{amount}}
+Due Date: {{dueDate}}
+Days Past Due: {{daysOverdue}} days
+
+This is your last opportunity to resolve this before I escalate to our legal department and credit reporting agencies.
+
+If I don't receive payment within 7 days, I will have no choice but to:
+• Report this delinquency to credit bureaus
+• Turn your account over to our legal department
+• Suspend all services immediately
+• Add collection fees and legal costs to your balance
+
+I don't want it to come to this. Please pay online immediately or call me to arrange payment today.
+
+{{companyName}}`
+  },
   final_notice: {
     subject: 'FINAL NOTICE: Invoice {{invoiceNumber}} - Action Required',
     body: `{{customerName}},
@@ -235,17 +295,24 @@ I don't want it to come to this. Please call me immediately to avoid legal actio
 };
 
 const DEFAULT_SMS_TEMPLATES = {
+  pre_due_reminder: `Hi {{customerName}}, friendly reminder that invoice {{invoiceNumber}} (${{amount}}) is due tomorrow ({{dueDate}}). Pay online: [payment link] Thanks! - {{companyName}}`,
+  due_date_notice: `Hi {{customerName}}, invoice {{invoiceNumber}} (${{amount}}) is due today. Pay online: [payment link] Thanks! - {{companyName}}`,
   gentle_reminder: `Hi {{customerName}}, hope you're well. Just a reminder that invoice {{invoiceNumber}} (${{amount}}) was due {{daysOverdue}} days ago. Please send payment when you get a chance. Thanks! - {{companyName}}`,
   second_reminder: `Hi {{customerName}}, following up on invoice {{invoiceNumber}} (${{amount}}) - it's {{daysOverdue}} days past due. I need to get this resolved soon. Can you send payment today? Call me if any issues. - {{companyName}}`,
   firm_reminder: `{{customerName}}, I haven't received payment for invoice {{invoiceNumber}} (${{amount}}, {{daysOverdue}} days overdue). I need payment in 48 hours to avoid escalation. Please call me today. - {{companyName}}`,
+  fourth_reminder: `{{customerName}}, CRITICAL: Invoice {{invoiceNumber}} (${{amount}}) is {{daysOverdue}} days overdue. Account in jeopardy. PAY IMMEDIATELY: [payment link] Call NOW to avoid legal action. - {{companyName}}`,
   final_notice: `{{customerName}}, FINAL NOTICE: Invoice {{invoiceNumber}} (${{amount}}) is {{daysOverdue}} days overdue. I must receive payment in 7 days or turn this over to legal. Please call me now. - {{companyName}}`
 };
 
 const DEFAULT_FOLLOWUP_RULES = [
-  { name: 'Gentle Reminder', trigger_days_overdue: 3, follow_up_type: 'email', template_type: 'gentle_reminder', active: true },
-  { name: 'Second Reminder', trigger_days_overdue: 7, follow_up_type: 'email', template_type: 'second_reminder', active: true },
-  { name: 'Final Notice', trigger_days_overdue: 14, follow_up_type: 'email', template_type: 'firm_reminder', active: true },
-  { name: 'Legal Warning', trigger_days_overdue: 21, follow_up_type: 'email', template_type: 'final_notice', active: true }
+  { name: 'Pre-Due Reminder', trigger_days_overdue: -1, follow_up_type: 'email', template_type: 'pre_due_reminder', active: true },
+  { name: 'Due Date Notice', trigger_days_overdue: 0, follow_up_type: 'email', template_type: 'due_date_notice', active: true },
+  { name: 'First Reminder', trigger_days_overdue: 7, follow_up_type: 'email', template_type: 'gentle_reminder', active: true },
+  { name: 'Second Reminder', trigger_days_overdue: 10, follow_up_type: 'email', template_type: 'second_reminder', active: true },
+  { name: 'Third Reminder', trigger_days_overdue: 14, follow_up_type: 'email', template_type: 'firm_reminder', active: true },
+  { name: 'Fourth Reminder', trigger_days_overdue: 21, follow_up_type: 'email', template_type: 'fourth_reminder', active: true },
+  { name: 'Final Notice', trigger_days_overdue: 28, follow_up_type: 'email', template_type: 'final_notice', active: true },
+  { name: 'Phone Call Follow-up', trigger_days_overdue: 30, follow_up_type: 'call', template_type: 'phone_script', active: false }
 ];
 
 // Load follow-up settings
@@ -295,10 +362,10 @@ function displayFollowUpRules(rules) {
           <option value="call" ${rule.follow_up_type === 'call' ? 'selected' : ''}>Call</option>
         </select>
         <span class="text-sm">after</span>
-        <input type="number" value="${rule.trigger_days_overdue}" min="1" max="365"
+        <input type="number" value="${rule.trigger_days_overdue}" min="-10" max="365"
                onchange="updateRule(${index}, 'trigger_days_overdue', parseInt(this.value))"
                class="w-16 border rounded px-2 py-1">
-        <span class="text-sm">days overdue</span>
+        <span class="text-sm">${rule.trigger_days_overdue < 0 ? 'days before due' : rule.trigger_days_overdue === 0 ? 'on due date' : 'days overdue'}</span>
       </div>
       <button onclick="removeRule(${index})" class="text-red-600 hover:text-red-800">Remove</button>
     </div>
@@ -306,35 +373,47 @@ function displayFollowUpRules(rules) {
 }
 
 function loadEmailTemplates() {
-  document.getElementById('emailSubject1').value = DEFAULT_EMAIL_TEMPLATES.gentle_reminder.subject;
-  document.getElementById('emailTemplate1').value = DEFAULT_EMAIL_TEMPLATES.gentle_reminder.body;
+  document.getElementById('emailSubject1').value = DEFAULT_EMAIL_TEMPLATES.pre_due_reminder.subject;
+  document.getElementById('emailTemplate1').value = DEFAULT_EMAIL_TEMPLATES.pre_due_reminder.body;
   
-  document.getElementById('emailSubject2').value = DEFAULT_EMAIL_TEMPLATES.second_reminder.subject;
-  document.getElementById('emailTemplate2').value = DEFAULT_EMAIL_TEMPLATES.second_reminder.body;
+  document.getElementById('emailSubject2').value = DEFAULT_EMAIL_TEMPLATES.due_date_notice.subject;
+  document.getElementById('emailTemplate2').value = DEFAULT_EMAIL_TEMPLATES.due_date_notice.body;
   
-  document.getElementById('emailSubject3').value = DEFAULT_EMAIL_TEMPLATES.firm_reminder.subject;
-  document.getElementById('emailTemplate3').value = DEFAULT_EMAIL_TEMPLATES.firm_reminder.body;
+  document.getElementById('emailSubject3').value = DEFAULT_EMAIL_TEMPLATES.gentle_reminder.subject;
+  document.getElementById('emailTemplate3').value = DEFAULT_EMAIL_TEMPLATES.gentle_reminder.body;
   
-  document.getElementById('emailSubject4').value = DEFAULT_EMAIL_TEMPLATES.final_notice.subject;
-  document.getElementById('emailTemplate4').value = DEFAULT_EMAIL_TEMPLATES.final_notice.body;
+  document.getElementById('emailSubject4').value = DEFAULT_EMAIL_TEMPLATES.second_reminder.subject;
+  document.getElementById('emailTemplate4').value = DEFAULT_EMAIL_TEMPLATES.second_reminder.body;
+  
+  document.getElementById('emailSubject5').value = DEFAULT_EMAIL_TEMPLATES.firm_reminder.subject;
+  document.getElementById('emailTemplate5').value = DEFAULT_EMAIL_TEMPLATES.firm_reminder.body;
+  
+  document.getElementById('emailSubject6').value = DEFAULT_EMAIL_TEMPLATES.fourth_reminder.subject;
+  document.getElementById('emailTemplate6').value = DEFAULT_EMAIL_TEMPLATES.fourth_reminder.body;
+  
+  document.getElementById('emailSubject7').value = DEFAULT_EMAIL_TEMPLATES.final_notice.subject;
+  document.getElementById('emailTemplate7').value = DEFAULT_EMAIL_TEMPLATES.final_notice.body;
 }
 
 function loadSMSTemplates() {
-  document.getElementById('smsTemplate1').value = DEFAULT_SMS_TEMPLATES.gentle_reminder;
-  document.getElementById('smsTemplate2').value = DEFAULT_SMS_TEMPLATES.second_reminder;
-  document.getElementById('smsTemplate3').value = DEFAULT_SMS_TEMPLATES.firm_reminder;
-  document.getElementById('smsTemplate4').value = DEFAULT_SMS_TEMPLATES.final_notice;
+  document.getElementById('smsTemplate1').value = DEFAULT_SMS_TEMPLATES.pre_due_reminder;
+  document.getElementById('smsTemplate2').value = DEFAULT_SMS_TEMPLATES.due_date_notice;
+  document.getElementById('smsTemplate3').value = DEFAULT_SMS_TEMPLATES.gentle_reminder;
+  document.getElementById('smsTemplate4').value = DEFAULT_SMS_TEMPLATES.second_reminder;
+  document.getElementById('smsTemplate5').value = DEFAULT_SMS_TEMPLATES.firm_reminder;
+  document.getElementById('smsTemplate6').value = DEFAULT_SMS_TEMPLATES.fourth_reminder;
+  document.getElementById('smsTemplate7').value = DEFAULT_SMS_TEMPLATES.final_notice;
 }
 
 function setupCharacterCounters() {
-  for (let i = 1; i <= 4; i++) {
+  for (let i = 1; i <= 7; i++) {
     const textarea = document.getElementById(`smsTemplate${i}`);
     const counter = document.getElementById(`smsCount${i}`);
     
     function updateCounter() {
       const count = textarea.value.length;
       counter.textContent = count;
-      counter.className = count > 160 ? 'text-red-500' : 'text-gray-500';
+      counter.className = count > 320 ? 'text-red-500' : count > 160 ? 'text-yellow-500' : 'text-gray-500';
     }
     
     textarea.addEventListener('input', updateCounter);

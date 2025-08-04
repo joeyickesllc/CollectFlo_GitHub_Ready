@@ -12,29 +12,57 @@ const logger = require('../backend/services/logger');
  */
 const DEFAULT_FOLLOWUP_RULES = [
   {
+    name: 'Pre-Due Reminder',
+    trigger_days_overdue: -1,
+    follow_up_type: 'email',
+    template_type: 'pre_due_reminder',
+    active: true
+  },
+  {
+    name: 'Due Date Notice',
+    trigger_days_overdue: 0,
+    follow_up_type: 'email',
+    template_type: 'due_date_notice',
+    active: true
+  },
+  {
     name: 'First Reminder',
-    trigger_days_overdue: 3,
+    trigger_days_overdue: 7,
     follow_up_type: 'email',
     template_type: 'gentle_reminder',
     active: true
   },
   {
     name: 'Second Reminder', 
-    trigger_days_overdue: 7,
+    trigger_days_overdue: 10,
+    follow_up_type: 'email',
+    template_type: 'second_reminder',
+    active: true
+  },
+  {
+    name: 'Third Reminder',
+    trigger_days_overdue: 14,
     follow_up_type: 'email',
     template_type: 'firm_reminder',
     active: true
   },
   {
+    name: 'Fourth Reminder',
+    trigger_days_overdue: 21,
+    follow_up_type: 'email',
+    template_type: 'fourth_reminder',
+    active: true
+  },
+  {
     name: 'Final Notice',
-    trigger_days_overdue: 14,
+    trigger_days_overdue: 28,
     follow_up_type: 'email',
     template_type: 'final_notice',
     active: true
   },
   {
     name: 'Phone Call Follow-up',
-    trigger_days_overdue: 21,
+    trigger_days_overdue: 30,
     follow_up_type: 'call',
     template_type: 'phone_script',
     active: false // Disabled by default, requires manual setup

@@ -20,13 +20,19 @@ try {
  * SMS templates for different follow-up types
  */
 const SMS_TEMPLATES = {
-  gentle_reminder: `Hi {{customerName}}, hope you're well. Just a reminder that invoice {{invoiceNumber}} (${{amount}}) was due {{daysOverdue}} days ago. Please send payment when you get a chance. Thanks! - {{companyName}}`,
+  pre_due_reminder: `Hi {{customerName}}, friendly reminder that invoice {{invoiceNumber}} (${{amount}}) is due tomorrow ({{dueDate}}). Pay online: {{paymentLink}} Thanks! - {{companyName}}`,
   
-  second_reminder: `Hi {{customerName}}, following up on invoice {{invoiceNumber}} (${{amount}}) - it's {{daysOverdue}} days past due. I need to get this resolved soon. Can you send payment today? Call me if any issues. - {{companyName}}`,
+  due_date_notice: `Hi {{customerName}}, invoice {{invoiceNumber}} (${{amount}}) is due today. Pay online: {{paymentLink}} Thanks! - {{companyName}}`,
   
-  firm_reminder: `{{customerName}}, I haven't received payment for invoice {{invoiceNumber}} (${{amount}}, {{daysOverdue}} days overdue). I need payment in 48 hours to avoid escalation. Please call me today. - {{companyName}}`,
+  gentle_reminder: `Hi {{customerName}}, hope you're well. Just a reminder that invoice {{invoiceNumber}} (${{amount}}) was due {{daysOverdue}} days ago. Pay online: {{paymentLink}} Thanks! - {{companyName}}`,
   
-  final_notice: `{{customerName}}, FINAL NOTICE: Invoice {{invoiceNumber}} (${{amount}}) is {{daysOverdue}} days overdue. I must receive payment in 7 days or turn this over to legal. Please call me now. - {{companyName}}`
+  second_reminder: `Hi {{customerName}}, invoice {{invoiceNumber}} (${{amount}}) is {{daysOverdue}} days past due. Please pay today: {{paymentLink}} Call me if any issues. - {{companyName}}`,
+  
+  firm_reminder: `{{customerName}}, invoice {{invoiceNumber}} (${{amount}}) is {{daysOverdue}} days overdue. PAY NOW to avoid escalation: {{paymentLink}} Call me today. - {{companyName}}`,
+  
+  fourth_reminder: `{{customerName}}, CRITICAL: Invoice {{invoiceNumber}} (${{amount}}) is {{daysOverdue}} days overdue. Account in jeopardy. PAY IMMEDIATELY: {{paymentLink}} Call NOW to avoid legal action. - {{companyName}}`,
+  
+  final_notice: `{{customerName}}, FINAL NOTICE: Invoice {{invoiceNumber}} (${{amount}}) is {{daysOverdue}} days overdue. PAY IMMEDIATELY: {{paymentLink}} or legal action in 7 days. Call now. - {{companyName}}`
 };
 
 /**
@@ -137,9 +143,11 @@ async function sendFollowUpSMS(params) {
     customerName,
     amount,
     daysOverdue,
+    dueDate,
     templateType = 'gentle_reminder',
     companyId,
-    customerPhone
+    customerPhone,
+    paymentLink
   } = params;
 
   try {
@@ -172,14 +180,17 @@ async function sendFollowUpSMS(params) {
       invoiceNumber: invoiceId,
       amount: parseFloat(amount || 0).toFixed(2),
       daysOverdue: daysOverdue || 0,
-      companyName: companySettings.companyName
+      dueDate: dueDate ? new Date(dueDate).toLocaleDateString() : 'N/A',
+      companyName: companySettings.companyName,
+      paymentLink: paymentLink || '[Payment link not available]'
     };
 
     // Process template
     const message = processSMSTemplate(template, variables);
 
-    // Ensure message is under SMS character limit (160 characters)
-    const maxLength = 160;
+    // SMS can handle up to 1600 characters with concatenation
+    // But keep under 320 characters (2 SMS segments) for better delivery rates
+    const maxLength = 320;
     const finalMessage = message.length > maxLength 
       ? message.substring(0, maxLength - 3) + '...'
       : message;
@@ -316,7 +327,8 @@ async function sendTestFollowUpSMS(toPhone, testData = {}) {
     daysOverdue: testData.daysOverdue || 5,
     templateType: testData.templateType || 'gentle_reminder',
     companyId: testData.companyId || 1,
-    customerPhone: toPhone
+    customerPhone: toPhone,
+    paymentLink: testData.paymentLink || 'https://example.com/pay/test-123'
   };
 
   return await sendFollowUpSMS(testParams);
