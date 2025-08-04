@@ -59,6 +59,120 @@
       </form>
     </div>
 
+    <!-- Follow-Up Settings -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+      <h3 class="text-xl font-semibold mb-6">Follow-Up Settings</h3>
+      
+      <!-- Follow-Up Rules -->
+      <div class="mb-8">
+        <h4 class="text-lg font-medium mb-4">Follow-Up Schedule</h4>
+        <p class="text-sm text-gray-600 mb-4">Configure when follow-ups are sent based on days past due:</p>
+        
+        <div id="followUpRules" class="space-y-4">
+          <!-- Rules will be loaded here by JavaScript -->
+        </div>
+        
+        <button type="button" id="addRuleBtn" class="mt-4 text-indigo-600 hover:text-indigo-800 text-sm font-medium">
+          + Add Follow-Up Rule
+        </button>
+      </div>
+      
+      <!-- Email Templates -->
+      <div class="mb-8">
+        <h4 class="text-lg font-medium mb-4">Email Templates</h4>
+        <p class="text-sm text-gray-600 mb-4">Customize your follow-up email messages. Use {{customerName}}, {{invoiceNumber}}, {{amount}}, {{dueDate}}, and {{daysOverdue}} as placeholders:</p>
+        
+        <div class="space-y-6">
+          <div>
+            <label class="block text-sm font-medium mb-2">Gentle Reminder (3 days overdue)</label>
+            <input type="text" id="emailSubject1" placeholder="Subject line" class="w-full p-2 border rounded mb-2">
+            <textarea id="emailTemplate1" rows="4" class="w-full p-2 border rounded" placeholder="Email message..."></textarea>
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium mb-2">Second Reminder (7+ days overdue)</label>
+            <input type="text" id="emailSubject2" placeholder="Subject line" class="w-full p-2 border rounded mb-2">
+            <textarea id="emailTemplate2" rows="4" class="w-full p-2 border rounded" placeholder="Email message..."></textarea>
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium mb-2">Firm Reminder (14+ days overdue)</label>
+            <input type="text" id="emailSubject3" placeholder="Subject line" class="w-full p-2 border rounded mb-2">
+            <textarea id="emailTemplate3" rows="4" class="w-full p-2 border rounded" placeholder="Email message..."></textarea>
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium mb-2">Final Notice (21+ days overdue)</label>
+            <input type="text" id="emailSubject4" placeholder="Subject line" class="w-full p-2 border rounded mb-2">
+            <textarea id="emailTemplate4" rows="4" class="w-full p-2 border rounded" placeholder="Email message..."></textarea>
+          </div>
+        </div>
+      </div>
+      
+      <!-- SMS Templates -->
+      <div class="mb-8">
+        <h4 class="text-lg font-medium mb-4">SMS Templates</h4>
+        <p class="text-sm text-gray-600 mb-4">Customize your follow-up text messages (160 character limit recommended):</p>
+        
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-2">Gentle Reminder SMS</label>
+            <textarea id="smsTemplate1" rows="2" class="w-full p-2 border rounded" placeholder="SMS message..." maxlength="160"></textarea>
+            <div class="text-xs text-gray-500 mt-1">Characters: <span id="smsCount1">0</span>/160</div>
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium mb-2">Second Reminder SMS</label>
+            <textarea id="smsTemplate2" rows="2" class="w-full p-2 border rounded" placeholder="SMS message..." maxlength="160"></textarea>
+            <div class="text-xs text-gray-500 mt-1">Characters: <span id="smsCount2">0</span>/160</div>
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium mb-2">Firm Reminder SMS</label>
+            <textarea id="smsTemplate3" rows="2" class="w-full p-2 border rounded" placeholder="SMS message..." maxlength="160"></textarea>
+            <div class="text-xs text-gray-500 mt-1">Characters: <span id="smsCount3">0</span>/160</div>
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium mb-2">Final Notice SMS</label>
+            <textarea id="smsTemplate4" rows="2" class="w-full p-2 border rounded" placeholder="SMS message..." maxlength="160"></textarea>
+            <div class="text-xs text-gray-500 mt-1">Characters: <span id="smsCount4">0</span>/160</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Communication Preferences -->
+      <div class="mb-6">
+        <h4 class="text-lg font-medium mb-4">Communication Preferences</h4>
+        <div class="space-y-3">
+          <label class="flex items-center">
+            <input type="checkbox" id="enableEmail" class="mr-2" checked>
+            <span>Send email follow-ups</span>
+          </label>
+          <label class="flex items-center">
+            <input type="checkbox" id="enableSMS" class="mr-2">
+            <span>Send SMS follow-ups</span>
+          </label>
+          <label class="flex items-center">
+            <input type="checkbox" id="enableCalls" class="mr-2">
+            <span>Create call reminders (manual)</span>
+          </label>
+        </div>
+      </div>
+      
+      <div class="flex space-x-4">
+        <button type="button" id="saveFollowUpSettings" class="bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700">
+          Save Follow-Up Settings
+        </button>
+        <button type="button" id="resetToDefaults" class="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600">
+          Reset to Defaults
+        </button>
+        <button type="button" id="previewFollowUp" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">
+          Preview & Test
+        </button>
+      </div>
+    </div>
+
     <div class="bg-white rounded-lg shadow-md p-6">
       <h3 class="text-xl font-semibold mb-4">QuickBooks Connection</h3>
       <div id="qboStatus" class="mb-4">Checking connection...</div>
