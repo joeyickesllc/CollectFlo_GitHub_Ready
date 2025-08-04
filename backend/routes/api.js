@@ -614,12 +614,160 @@ router.post('/follow-ups/:id/complete', requireAuth, async (req, res, next) => {
 });
 
 /**
+ * Follow-Up Processing Routes
+ */
+router.post('/follow-ups/process', requireAuth, async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { companyId, urgentOnly = false, limit = 50 } = req.body;
+    
+    // Get user's company ID for security
+    const userCompany = await db.queryOne(
+      'SELECT company_id FROM users WHERE id = $1',
+      [userId]
+    );
+    
+    if (!userCompany) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'User company not found' 
+      });
+    }
+    
+    // Only allow processing user's own company unless admin
+    const targetCompanyId = companyId || userCompany.company_id;
+    if (targetCompanyId !== userCompany.company_id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to process follow-ups for this company'
+      });
+    }
+    
+    const { triggerManualProcessing } = require('../../services/followUpScheduler');
+    const results = await triggerManualProcessing(urgentOnly);
+    
+    res.json({
+      success: true,
+      message: 'Follow-up processing completed',
+      results
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/follow-ups/:id/send', requireAuth, async (req, res, next) => {
+  try {
+    const followUpId = req.params.id;
+    const userId = req.user.id;
+    
+    // Get user's company ID for security
+    const userCompany = await db.queryOne(
+      'SELECT company_id FROM users WHERE id = $1',
+      [userId]
+    );
+    
+    if (!userCompany) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'User company not found' 
+      });
+    }
+    
+    // Get the follow-up and verify ownership
+    const followUp = await db.queryOne(
+      'SELECT * FROM follow_ups WHERE id = $1 AND company_id = $2',
+      [followUpId, userCompany.company_id]
+    );
+    
+    if (!followUp) {
+      return res.status(404).json({
+        success: false,
+        message: 'Follow-up not found'
+      });
+    }
+    
+    if (followUp.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: `Follow-up already ${followUp.status}`
+      });
+    }
+    
+    // Process the follow-up
+    const { processFollowUp } = require('../../services/followUpProcessor');
+    const result = await processFollowUp(followUp);
+    
+    res.json({
+      success: result.success,
+      message: result.success ? 'Follow-up sent successfully' : 'Failed to send follow-up',
+      result
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/follow-ups/scheduler/status', requireAuth, async (req, res, next) => {
+  try {
+    const { getSchedulerStatus } = require('../../services/followUpScheduler');
+    const status = getSchedulerStatus();
+    
+    res.json({
+      success: true,
+      scheduler: status
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * Test Routes (for development only)
  */
-router.post('/test-email', async (req, res, next) => {
+router.post('/test-email', requireAuth, async (req, res, next) => {
   try {
-    // Will be replaced with testController.sendTestEmail
-    res.status(501).json({ message: 'Not implemented yet' });
+    const { toEmail, testData } = req.body;
+    
+    if (!toEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'toEmail is required'
+      });
+    }
+    
+    const { sendTestFollowUpEmail } = require('../../services/emailService');
+    const result = await sendTestFollowUpEmail(toEmail, testData);
+    
+    res.json({
+      success: true,
+      message: 'Test email sent successfully',
+      result
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/test-sms', requireAuth, async (req, res, next) => {
+  try {
+    const { toPhone, testData } = req.body;
+    
+    if (!toPhone) {
+      return res.status(400).json({
+        success: false,
+        message: 'toPhone is required'
+      });
+    }
+    
+    const { sendTestFollowUpSMS } = require('../../services/smsService');
+    const result = await sendTestFollowUpSMS(toPhone, testData);
+    
+    res.json({
+      success: true,
+      message: 'Test SMS sent successfully',
+      result
+    });
   } catch (error) {
     next(error);
   }

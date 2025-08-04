@@ -115,6 +115,71 @@ function initScheduler() {
       }
     });
 
+    // Process follow-ups - Every 15 minutes during business hours (9 AM - 6 PM, Monday-Friday)
+    scheduleTask('*/15 9-18 * * 1-5', 'process-followups', async () => {
+      logger.info('Running scheduled follow-up processing');
+      try {
+        const { processPendingFollowUps } = require('./followUpProcessor');
+        const results = await processPendingFollowUps(null, 100);
+        
+        logger.info('Follow-up processing completed', {
+          processed: results.processed,
+          successful: results.successful,
+          failed: results.failed
+        });
+      } catch (error) {
+        logger.error('Error in follow-up processing job', { error });
+      }
+    });
+
+    // Process urgent follow-ups - Every hour
+    scheduleTask('0 * * * *', 'process-urgent-followups', async () => {
+      logger.info('Running urgent follow-up processing');
+      try {
+        const { processPendingFollowUps } = require('./followUpProcessor');
+        // Process final notices and overdue items more frequently
+        const results = await processPendingFollowUps(null, 50);
+        
+        if (results.processed > 0) {
+          logger.info('Urgent follow-up processing completed', {
+            processed: results.processed,
+            successful: results.successful,
+            failed: results.failed
+          });
+        }
+      } catch (error) {
+        logger.error('Error in urgent follow-up processing job', { error });
+      }
+    });
+
+    // Follow-up cleanup and reporting - Daily at 3 AM
+    scheduleTask('0 3 * * *', 'followup-maintenance', async () => {
+      logger.info('Running follow-up maintenance');
+      try {
+        // Clean up old completed follow-ups (older than 90 days)
+        const cleanupResult = await db.execute(`
+          DELETE FROM follow_ups 
+          WHERE status IN ('completed', 'delivered') 
+            AND updated_at < NOW() - INTERVAL '90 days'
+        `);
+        
+        // Archive old failed follow-ups
+        const archiveResult = await db.execute(`
+          UPDATE follow_ups 
+          SET status = 'archived' 
+          WHERE status = 'failed' 
+            AND failed_at < NOW() - INTERVAL '30 days'
+        `);
+        
+        logger.info('Follow-up maintenance completed', {
+          deletedFollowUps: cleanupResult.rowCount || 0,
+          archivedFollowUps: archiveResult.rowCount || 0
+        });
+      } catch (error) {
+        logger.error('Error in follow-up maintenance job', { error });
+      }
+    });
+
     // Health check ping - Every 5 minutes
     scheduleTask('*/5 * * * *', 'health-check', async () => {
       try {
