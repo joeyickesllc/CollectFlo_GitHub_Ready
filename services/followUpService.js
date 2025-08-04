@@ -263,15 +263,14 @@ async function processOverdueInvoices(companyId = null) {
  */
 async function getPendingFollowUps(companyId, limit = 50) {
   try {
+    // Query follow-ups directly since we use QuickBooks IDs, not local invoice/customer records
     const followUps = await db.query(`
       SELECT 
         f.*,
-        i.doc_number as invoice_number,
-        i.total_amount as invoice_amount,
-        c.name as customer_name
+        f.invoice_id as invoice_number,  -- QuickBooks invoice ID
+        NULL as invoice_amount,          -- Will be fetched from QuickBooks when needed
+        NULL as customer_name            -- Will be fetched from QuickBooks when needed
       FROM follow_ups f
-      LEFT JOIN invoices i ON f.invoice_id = i.id
-      LEFT JOIN customers c ON f.customer_id = c.id
       WHERE f.company_id = $1 
         AND f.status = 'pending'
         AND f.scheduled_at <= NOW() + INTERVAL '1 hour'
