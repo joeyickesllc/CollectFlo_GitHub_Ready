@@ -36,14 +36,22 @@
     <h1>Follow-Up Processing Test</h1>
     
     <div>
-        <button class="button" onclick="testAPI()">Test API Connection</button>
-        <button class="button" onclick="triggerFollowUps()">Trigger Follow-Up Processing</button>
-        <button class="button" onclick="checkAuth()">Check Authentication</button>
+        <button class="button" id="testBtn">Test API Connection</button>
+        <button class="button" id="triggerBtn">Trigger Follow-Up Processing</button>
+        <button class="button" id="authBtn">Check Authentication</button>
     </div>
     
     <div id="result"></div>
 
     <script>
+        // Wait for DOM to load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add event listeners
+            document.getElementById('testBtn').addEventListener('click', testAPI);
+            document.getElementById('triggerBtn').addEventListener('click', triggerFollowUps);
+            document.getElementById('authBtn').addEventListener('click', checkAuth);
+        });
+
         async function makeRequest(url, options = {}) {
             const resultDiv = document.getElementById('result');
             resultDiv.innerHTML = `Making request to ${url}...`;

@@ -420,3 +420,105 @@ function getStatusColor(status) {
         default: return 'bg-gray-100 text-gray-800';
     }
 }
+
+// Follow-up testing functions
+async function testFollowUpProcessing() {
+    const resultDiv = document.getElementById('testResult');
+    resultDiv.classList.remove('hidden');
+    resultDiv.innerHTML = 'Testing follow-up processing...';
+    resultDiv.className = 'p-4 rounded bg-yellow-100 text-sm';
+    
+    try {
+        const response = await fetch('/api/admin/trigger-followups', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            resultDiv.className = 'p-4 rounded bg-green-100 text-sm';
+            resultDiv.innerHTML = `
+<strong>✅ Follow-up processing completed!</strong>
+• Processed: ${data.results.processed}
+• Successful: ${data.results.successful}  
+• Failed: ${data.results.failed}
+• Duration: ${data.results.duration}ms
+
+${data.results.errors.length > 0 ? '⚠️ Errors:\n' + data.results.errors.map(e => '• ' + (e.error || JSON.stringify(e))).join('\n') : ''}`;
+        } else {
+            resultDiv.className = 'p-4 rounded bg-red-100 text-sm';
+            resultDiv.innerHTML = `
+<strong>❌ Follow-up processing failed</strong>
+Status: ${response.status}
+Error: ${data.message || 'Unknown error'}`;
+        }
+    } catch (error) {
+        resultDiv.className = 'p-4 rounded bg-red-100 text-sm';
+        resultDiv.innerHTML = `
+<strong>❌ Request failed</strong>
+Error: ${error.message}
+
+This might be because:
+• You're not logged in
+• The server is not running
+• Network connectivity issue`;
+    }
+}
+
+async function testApiConnection() {
+    const resultDiv = document.getElementById('testResult');
+    resultDiv.classList.remove('hidden');
+    resultDiv.innerHTML = 'Testing API connection...';
+    resultDiv.className = 'p-4 rounded bg-yellow-100 text-sm';
+    
+    try {
+        const response = await fetch('/api/admin/test', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            resultDiv.className = 'p-4 rounded bg-green-100 text-sm';
+            resultDiv.innerHTML = `
+<strong>✅ API connection successful!</strong>
+• User ID: ${data.user.id}
+• Timestamp: ${data.user.timestamp}
+• Message: ${data.message}`;
+        } else {
+            resultDiv.className = 'p-4 rounded bg-red-100 text-sm';
+            resultDiv.innerHTML = `
+<strong>❌ API test failed</strong>
+Status: ${response.status}
+Response: ${JSON.stringify(data, null, 2)}`;
+        }
+    } catch (error) {
+        resultDiv.className = 'p-4 rounded bg-red-100 text-sm';
+        resultDiv.innerHTML = `
+<strong>❌ API test failed</strong>
+Error: ${error.message}`;
+    }
+}
+
+// Add event listeners when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    // Add event listeners for test buttons
+    const testFollowupBtn = document.getElementById('testFollowupBtn');
+    const testApiBtn = document.getElementById('testApiBtn');
+    
+    if (testFollowupBtn) {
+        testFollowupBtn.addEventListener('click', testFollowUpProcessing);
+    }
+    
+    if (testApiBtn) {
+        testApiBtn.addEventListener('click', testApiConnection);
+    }
+});
