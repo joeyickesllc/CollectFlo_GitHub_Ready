@@ -21,6 +21,7 @@ const logger = require('../services/logger');
 // `user_activity` table structure (ip_address column) once per lifecycle
 // instead of on every request.  This avoids unnecessary queries at runtime.
 let userActivityColumnChecked = false;
+let sequenceSyncChecked = false;
 
 /**
  * Track page visits
@@ -244,6 +245,39 @@ exports.trackUserAction = (actionType, detailsExtractor) => {
 };
 
 /**
+ * Ensure the user_activity sequence is properly synchronized
+ * This fixes issues where the sequence gets out of sync with existing data
+ */
+async function ensureSequenceSync() {
+  if (sequenceSyncChecked) return;
+  
+  try {
+    // Get the current maximum ID from the table
+    const maxIdResult = await db.queryOne('SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM user_activity');
+    const nextId = maxIdResult?.next_id || 1;
+    
+    // Get the current sequence value
+    const seqResult = await db.queryOne("SELECT nextval('user_activity_id_seq') AS current_seq");
+    const currentSeq = seqResult?.current_seq || 1;
+    
+    // If sequence is behind the actual max ID, fix it
+    if (currentSeq <= nextId) {
+      await db.execute(`SELECT setval('user_activity_id_seq', $1, false)`, [nextId]);
+      logger.info('Fixed user_activity sequence synchronization', {
+        oldSequence: currentSeq,
+        newSequence: nextId,
+        maxTableId: nextId - 1
+      });
+    }
+    
+    sequenceSyncChecked = true;
+  } catch (error) {
+    logger.warn('Failed to check/fix user_activity sequence', { error: error.message });
+    // Don't throw - this is a best-effort fix
+  }
+}
+
+/**
  * Store activity in the database
  * 
  * @param {Object} activity - Activity data to store
@@ -314,6 +348,9 @@ async function storeActivity({ user_id, activity_type, details, ip_address }) {
       user_id,
       details_keys: Object.keys(safeDetails)
     });
+
+    // Check and fix sequence if needed before inserting
+    await ensureSequenceSync();
 
     return await db.execute(
       'INSERT INTO user_activity (user_id, activity_type, details, ip_address, created_at) VALUES ($1, $2, $3, $4, NOW())',
