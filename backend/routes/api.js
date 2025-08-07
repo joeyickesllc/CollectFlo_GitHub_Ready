@@ -358,6 +358,63 @@ router.post('/settings/logo', requireAuth, async (req, res, next) => {
   }
 });
 
+/**
+ * Manual Follow-Up Processing Trigger (for testing and troubleshooting)
+ */
+router.post('/admin/trigger-followups', requireAuth, async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    
+    // Get user's company ID
+    const userCompany = await db.queryOne(
+      'SELECT company_id FROM users WHERE id = $1',
+      [userId]
+    );
+    
+    if (!userCompany) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'User company not found' 
+      });
+    }
+    
+    logger.info('Manual follow-up processing triggered', { 
+      userId, 
+      companyId: userCompany.company_id 
+    });
+    
+    // Import and trigger follow-up processing
+    const { processPendingFollowUps } = require('../../services/followUpProcessor');
+    
+    const results = await processPendingFollowUps(userCompany.company_id, 100);
+    
+    logger.info('Manual follow-up processing completed', {
+      userId,
+      companyId: userCompany.company_id,
+      results
+    });
+    
+    res.json({ 
+      success: true, 
+      message: 'Follow-up processing completed',
+      results: {
+        processed: results.processed,
+        successful: results.successful,
+        failed: results.failed,
+        duration: results.duration,
+        errors: results.errors
+      }
+    });
+    
+  } catch (error) {
+    logger.error('Error in manual follow-up processing', {
+      error: error.message,
+      userId: req.user?.id
+    });
+    next(error);
+  }
+});
+
 router.get('/templates', requireAuth, async (req, res, next) => {
   try {
     // Will be replaced with settingsController.getTemplates
@@ -379,12 +436,35 @@ router.post('/templates/:id', requireAuth, async (req, res, next) => {
 /**
  * Invoice & Payment Routes
  */
-router.get('/create-payment-link/:invoiceId', async (req, res, next) => {
+router.get('/create-payment-link/:invoiceId', requireAuth, async (req, res, next) => {
   try {
-    // Will be replaced with invoiceController.createPaymentLink
-    res.status(501).json({ message: 'Not implemented yet' });
+    const invoiceId = req.params.invoiceId;
+    const userId = req.user.id;
+    
+    const { generateQuickBooksPaymentLink } = require('../../services/paymentLinkService');
+    
+    const paymentLinkData = await generateQuickBooksPaymentLink(invoiceId, userId);
+    
+    res.json({
+      success: true,
+      paymentLink: paymentLinkData.paymentUrl,
+      invoiceNumber: paymentLinkData.invoiceNumber,
+      amount: paymentLinkData.amount,
+      customerName: paymentLinkData.customerName,
+      dueDate: paymentLinkData.dueDate
+    });
   } catch (error) {
-    next(error);
+    logger.error('Error creating payment link', {
+      error: error.message,
+      invoiceId: req.params.invoiceId,
+      userId: req.user?.id
+    });
+    
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create payment link',
+      error: error.message
+    });
   }
 });
 
