@@ -359,17 +359,51 @@ router.post('/settings/logo', requireAuth, async (req, res, next) => {
 });
 
 /**
+ * Test endpoint to verify API is working
+ */
+router.post('/admin/test', requireAuth, async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    
+    logger.info('Test endpoint called', { userId });
+    
+    res.json({ 
+      success: true, 
+      message: 'Test endpoint is working',
+      user: {
+        id: userId,
+        timestamp: new Date().toISOString()
+      }
+    });
+    
+  } catch (error) {
+    logger.error('Error in test endpoint', { error: error.message });
+    next(error);
+  }
+});
+
+/**
  * Manual Follow-Up Processing Trigger (for testing and troubleshooting)
  */
 router.post('/admin/trigger-followups', requireAuth, async (req, res, next) => {
   try {
     const userId = req.user.id;
     
+    logger.info('Manual follow-up processing endpoint called', { 
+      userId,
+      timestamp: new Date().toISOString()
+    });
+    
     // Get user's company ID
     const userCompany = await db.queryOne(
       'SELECT company_id FROM users WHERE id = $1',
       [userId]
     );
+    
+    logger.info('User company lookup result', { 
+      userId, 
+      userCompany: userCompany ? { company_id: userCompany.company_id } : null 
+    });
     
     if (!userCompany) {
       return res.status(400).json({ 
@@ -409,9 +443,14 @@ router.post('/admin/trigger-followups', requireAuth, async (req, res, next) => {
   } catch (error) {
     logger.error('Error in manual follow-up processing', {
       error: error.message,
+      stack: error.stack,
       userId: req.user?.id
     });
-    next(error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
   }
 });
 
