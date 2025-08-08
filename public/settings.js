@@ -373,36 +373,46 @@ function displayFollowUpRules(rules) {
 }
 
 function loadEmailTemplates() {
-  document.getElementById('emailSubject1').value = DEFAULT_EMAIL_TEMPLATES.pre_due_reminder.subject;
-  document.getElementById('emailTemplate1').value = DEFAULT_EMAIL_TEMPLATES.pre_due_reminder.body;
-  
-  document.getElementById('emailSubject2').value = DEFAULT_EMAIL_TEMPLATES.due_date_notice.subject;
-  document.getElementById('emailTemplate2').value = DEFAULT_EMAIL_TEMPLATES.due_date_notice.body;
-  
-  document.getElementById('emailSubject3').value = DEFAULT_EMAIL_TEMPLATES.gentle_reminder.subject;
-  document.getElementById('emailTemplate3').value = DEFAULT_EMAIL_TEMPLATES.gentle_reminder.body;
-  
-  document.getElementById('emailSubject4').value = DEFAULT_EMAIL_TEMPLATES.second_reminder.subject;
-  document.getElementById('emailTemplate4').value = DEFAULT_EMAIL_TEMPLATES.second_reminder.body;
-  
-  document.getElementById('emailSubject5').value = DEFAULT_EMAIL_TEMPLATES.firm_reminder.subject;
-  document.getElementById('emailTemplate5').value = DEFAULT_EMAIL_TEMPLATES.firm_reminder.body;
-  
-  document.getElementById('emailSubject6').value = DEFAULT_EMAIL_TEMPLATES.fourth_reminder.subject;
-  document.getElementById('emailTemplate6').value = DEFAULT_EMAIL_TEMPLATES.fourth_reminder.body;
-  
-  document.getElementById('emailSubject7').value = DEFAULT_EMAIL_TEMPLATES.final_notice.subject;
-  document.getElementById('emailTemplate7').value = DEFAULT_EMAIL_TEMPLATES.final_notice.body;
+  const setIfEmpty = (id, value) => {
+    const el = document.getElementById(id);
+    if (el && !el.value) el.value = value;
+  };
+
+  setIfEmpty('emailSubject1', DEFAULT_EMAIL_TEMPLATES.pre_due_reminder.subject);
+  setIfEmpty('emailTemplate1', DEFAULT_EMAIL_TEMPLATES.pre_due_reminder.body);
+
+  setIfEmpty('emailSubject2', DEFAULT_EMAIL_TEMPLATES.due_date_notice.subject);
+  setIfEmpty('emailTemplate2', DEFAULT_EMAIL_TEMPLATES.due_date_notice.body);
+
+  setIfEmpty('emailSubject3', DEFAULT_EMAIL_TEMPLATES.gentle_reminder.subject);
+  setIfEmpty('emailTemplate3', DEFAULT_EMAIL_TEMPLATES.gentle_reminder.body);
+
+  setIfEmpty('emailSubject4', DEFAULT_EMAIL_TEMPLATES.second_reminder.subject);
+  setIfEmpty('emailTemplate4', DEFAULT_EMAIL_TEMPLATES.second_reminder.body);
+
+  setIfEmpty('emailSubject5', DEFAULT_EMAIL_TEMPLATES.firm_reminder.subject);
+  setIfEmpty('emailTemplate5', DEFAULT_EMAIL_TEMPLATES.firm_reminder.body);
+
+  setIfEmpty('emailSubject6', DEFAULT_EMAIL_TEMPLATES.fourth_reminder.subject);
+  setIfEmpty('emailTemplate6', DEFAULT_EMAIL_TEMPLATES.fourth_reminder.body);
+
+  setIfEmpty('emailSubject7', DEFAULT_EMAIL_TEMPLATES.final_notice.subject);
+  setIfEmpty('emailTemplate7', DEFAULT_EMAIL_TEMPLATES.final_notice.body);
 }
 
 function loadSMSTemplates() {
-  document.getElementById('smsTemplate1').value = DEFAULT_SMS_TEMPLATES.pre_due_reminder;
-  document.getElementById('smsTemplate2').value = DEFAULT_SMS_TEMPLATES.due_date_notice;
-  document.getElementById('smsTemplate3').value = DEFAULT_SMS_TEMPLATES.gentle_reminder;
-  document.getElementById('smsTemplate4').value = DEFAULT_SMS_TEMPLATES.second_reminder;
-  document.getElementById('smsTemplate5').value = DEFAULT_SMS_TEMPLATES.firm_reminder;
-  document.getElementById('smsTemplate6').value = DEFAULT_SMS_TEMPLATES.fourth_reminder;
-  document.getElementById('smsTemplate7').value = DEFAULT_SMS_TEMPLATES.final_notice;
+  const setIfEmpty = (id, value) => {
+    const el = document.getElementById(id);
+    if (el && !el.value) el.value = value;
+  };
+
+  setIfEmpty('smsTemplate1', DEFAULT_SMS_TEMPLATES.pre_due_reminder);
+  setIfEmpty('smsTemplate2', DEFAULT_SMS_TEMPLATES.due_date_notice);
+  setIfEmpty('smsTemplate3', DEFAULT_SMS_TEMPLATES.gentle_reminder);
+  setIfEmpty('smsTemplate4', DEFAULT_SMS_TEMPLATES.second_reminder);
+  setIfEmpty('smsTemplate5', DEFAULT_SMS_TEMPLATES.firm_reminder);
+  setIfEmpty('smsTemplate6', DEFAULT_SMS_TEMPLATES.fourth_reminder);
+  setIfEmpty('smsTemplate7', DEFAULT_SMS_TEMPLATES.final_notice);
 }
 
 function setupCharacterCounters() {
