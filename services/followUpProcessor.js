@@ -28,9 +28,9 @@ async function fetchInvoiceFromQuickBooks(invoiceId, userId) {
       ? 'https://quickbooks.api.intuit.com/v3/company/'
       : 'https://sandbox-quickbooks.api.intuit.com/v3/company/';
 
-    // Fetch specific invoice
+    // Try direct GET for Invoice by Id
     const response = await axios.get(
-      `${apiBaseUrl}${tokens.realmId}/item/${invoiceId}`,
+      `${apiBaseUrl}${tokens.realmId}/invoice/${invoiceId}`,
       {
         headers: {
           'Authorization': `Bearer ${tokens.access_token}`,
@@ -39,28 +39,29 @@ async function fetchInvoiceFromQuickBooks(invoiceId, userId) {
       }
     );
 
-    const invoice = response.data.QueryResponse?.Invoice?.[0];
-    if (!invoice) {
-      // Try alternative query
-      const queryResponse = await axios.get(
-        `${apiBaseUrl}${tokens.realmId}/query?query=SELECT * FROM Invoice WHERE Id = '${invoiceId}'`,
-        {
-          headers: {
-            'Authorization': `Bearer ${tokens.access_token}`,
-            'Accept': 'application/json'
-          }
-        }
-      );
-      
-      const invoices = queryResponse.data.QueryResponse?.Invoice || [];
-      if (invoices.length === 0) {
-        throw new Error(`Invoice ${invoiceId} not found in QuickBooks`);
-      }
-      
-      return invoices[0];
+    // Direct entity GET returns the entity at the top-level key (Invoice)
+    const directInvoice = response.data?.Invoice;
+    if (directInvoice) {
+      return directInvoice;
     }
 
-    return invoice;
+    // Fallback to query API
+    const queryResponse = await axios.get(
+      `${apiBaseUrl}${tokens.realmId}/query?query=SELECT * FROM Invoice WHERE Id = '${invoiceId}'`,
+      {
+        headers: {
+          'Authorization': `Bearer ${tokens.access_token}`,
+          'Accept': 'application/json'
+        }
+      }
+    );
+    
+    const invoices = queryResponse.data.QueryResponse?.Invoice || [];
+    if (invoices.length === 0) {
+      throw new Error(`Invoice ${invoiceId} not found in QuickBooks`);
+    }
+    
+    return invoices[0];
   } catch (error) {
     logger.error('Error fetching invoice from QuickBooks', {
       error: error.message,
@@ -149,10 +150,11 @@ async function processFollowUp(followUp) {
             }
           );
 
-          const customer = customerResponse.data.QueryResponse?.Customer?.[0];
+          // Direct entity GET returns Customer at top-level
+          const customer = customerResponse.data?.Customer;
           if (customer) {
-            customerEmail = customer.PrimaryEmailAddr?.Address;
-            customerPhone = customer.PrimaryPhone?.FreeFormNumber || customer.Mobile?.FreeFormNumber;
+            customerEmail = customer.PrimaryEmailAddr?.Address || null;
+            customerPhone = customer.PrimaryPhone?.FreeFormNumber || customer.Mobile?.FreeFormNumber || null;
           }
         }
       } catch (customerError) {
@@ -162,6 +164,11 @@ async function processFollowUp(followUp) {
           invoiceId: followUp.invoice_id
         });
       }
+    }
+
+    // Fallback: some invoices include BillEmail
+    if (!customerEmail && invoice.BillEmail?.Address) {
+      customerEmail = invoice.BillEmail.Address;
     }
 
     // Prepare follow-up context
@@ -205,11 +212,34 @@ async function processFollowUp(followUp) {
         throw new Error(`Unsupported follow-up type: ${followUp.follow_up_type}`);
     }
 
-    // Update follow-up status to sent
-    await db.query(
-      'UPDATE follow_ups SET status = $1, sent_at = NOW(), updated_at = NOW() WHERE id = $2',
-      ['sent', followUp.id]
-    );
+    // Update follow-up status based on send result
+    try {
+      const status = (sendResult && sendResult.status) ? sendResult.status : 'sent';
+      const isSent = status === 'sent' || status === 'delivered';
+      const fields = [];
+      const params = [];
+      if (isSent) {
+        fields.push('status = $1', 'sent_at = NOW()', 'updated_at = NOW()');
+        params.push('sent');
+      } else if (status === 'prepared') {
+        // No contact available; mark as failed to avoid infinite retries
+        fields.push('status = $1', 'failed_at = NOW()', 'error_message = $2', 'updated_at = NOW()');
+        params.push('failed', 'No valid customer contact information');
+      } else {
+        fields.push('status = $1', 'updated_at = NOW()');
+        params.push(status);
+      }
+      params.push(followUp.id);
+      await db.query(
+        `UPDATE follow_ups SET ${fields.join(', ')} WHERE id = $${params.length}`,
+        params
+      );
+    } catch (updateError) {
+      logger.error('Failed to update follow-up status after send', {
+        error: updateError.message,
+        followUpId: followUp.id
+      });
+    }
 
     result.success = true;
     result.details = sendResult;

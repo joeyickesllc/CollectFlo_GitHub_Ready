@@ -76,9 +76,9 @@ async function createMissingTables() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS follow_ups (
         id SERIAL PRIMARY KEY,
-        company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
-        customer_id INTEGER REFERENCES customers(id) ON DELETE CASCADE,
-        invoice_id INTEGER REFERENCES invoices(id) ON DELETE CASCADE,
+        company_id INTEGER,
+        customer_id VARCHAR(50),
+        invoice_id VARCHAR(50),
         follow_up_type VARCHAR(50) NOT NULL, -- 'email', 'sms', 'call'
         status VARCHAR(50) DEFAULT 'pending', -- 'pending', 'sent', 'delivered', 'failed'
         scheduled_at TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -87,7 +87,7 @@ async function createMissingTables() {
         failed_at TIMESTAMP WITH TIME ZONE,
         error_message TEXT,
         message_content TEXT,
-        template_id INTEGER REFERENCES message_templates(id),
+        template_id INTEGER,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       )

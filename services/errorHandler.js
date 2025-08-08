@@ -1,23 +1,27 @@
+const db = require('../backend/db/connection');
 
-const db = require('../database.js');
+async function errorHandler(err, req, res, next) {
+  try {
+    await db.execute(
+      `INSERT INTO error_logs (level, message, stack, meta, timestamp)
+       VALUES ($1, $2, $3, $4, NOW())`,
+      [
+        'error',
+        err.message,
+        err.stack,
+        {
+          url: req.url,
+          method: req.method,
+          headers: { ...req.headers, cookie: undefined, authorization: undefined },
+          body: req.body
+        }
+      ]
+    );
+  } catch (logErr) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to log error to database:', logErr.message);
+  }
 
-function errorHandler(err, req, res, next) {
-  // Log error to database
-  db.prepare(`
-    INSERT INTO error_logs (error_message, error_stack, context, created_at)
-    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-  `).run(
-    err.message,
-    err.stack,
-    JSON.stringify({
-      url: req.url,
-      method: req.method,
-      headers: req.headers,
-      body: req.body
-    })
-  );
-
-  // Send appropriate response
   res.status(err.status || 500).json({
     error: process.env.NODE_ENV === 'production' 
       ? 'An unexpected error occurred'

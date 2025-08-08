@@ -1,7 +1,8 @@
 
 const sgMail = require('@sendgrid/mail');
 const twilio = require('twilio');
-const db = require('../database.js');
+// Legacy local sqlite module (../database.js) is not used elsewhere. Use Postgres connection for consistency.
+const db = require('../backend/db/connection');
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 const twilioClient = new twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
@@ -9,8 +10,8 @@ const twilioClient = new twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWIL
 async function sendMessage(followUp, template) {
   try {
     // Get company settings for customization
-    const settings = db.prepare('SELECT * FROM company_settings ORDER BY id DESC LIMIT 1').get();
-    const companyName = settings?.company_name || 'CollectFlo';
+    const settings = await db.queryOne('SELECT * FROM company_settings ORDER BY id DESC LIMIT 1');
+    const companyName = settings?.setting_key === 'company_name' ? settings.setting_value : (settings?.company_name || 'CollectFlo');
     
     // Replace template variables
     const subject = template.subject
@@ -51,11 +52,10 @@ async function sendMessage(followUp, template) {
       });
     }
     
-    db.prepare(`
-      UPDATE follow_ups 
-      SET delivered_at = CURRENT_TIMESTAMP 
-      WHERE id = ?
-    `).run(followUp.id);
+    await db.execute(
+      'UPDATE follow_ups SET delivered_at = NOW(), updated_at = NOW() WHERE id = $1',
+      [followUp.id]
+    );
     
     return true;
   } catch (error) {
