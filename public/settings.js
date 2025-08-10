@@ -378,26 +378,46 @@ function loadEmailTemplates() {
     if (el && !el.value) el.value = value;
   };
 
+  // Always set placeholders to the default templates so users can see defaults even if values exist
+  const setPlaceholder = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.placeholder = value;
+  };
+
   setIfEmpty('emailSubject1', DEFAULT_EMAIL_TEMPLATES.pre_due_reminder.subject);
   setIfEmpty('emailTemplate1', DEFAULT_EMAIL_TEMPLATES.pre_due_reminder.body);
+  setPlaceholder('emailSubject1', DEFAULT_EMAIL_TEMPLATES.pre_due_reminder.subject);
+  setPlaceholder('emailTemplate1', DEFAULT_EMAIL_TEMPLATES.pre_due_reminder.body);
 
   setIfEmpty('emailSubject2', DEFAULT_EMAIL_TEMPLATES.due_date_notice.subject);
   setIfEmpty('emailTemplate2', DEFAULT_EMAIL_TEMPLATES.due_date_notice.body);
+  setPlaceholder('emailSubject2', DEFAULT_EMAIL_TEMPLATES.due_date_notice.subject);
+  setPlaceholder('emailTemplate2', DEFAULT_EMAIL_TEMPLATES.due_date_notice.body);
 
   setIfEmpty('emailSubject3', DEFAULT_EMAIL_TEMPLATES.gentle_reminder.subject);
   setIfEmpty('emailTemplate3', DEFAULT_EMAIL_TEMPLATES.gentle_reminder.body);
+  setPlaceholder('emailSubject3', DEFAULT_EMAIL_TEMPLATES.gentle_reminder.subject);
+  setPlaceholder('emailTemplate3', DEFAULT_EMAIL_TEMPLATES.gentle_reminder.body);
 
   setIfEmpty('emailSubject4', DEFAULT_EMAIL_TEMPLATES.second_reminder.subject);
   setIfEmpty('emailTemplate4', DEFAULT_EMAIL_TEMPLATES.second_reminder.body);
+  setPlaceholder('emailSubject4', DEFAULT_EMAIL_TEMPLATES.second_reminder.subject);
+  setPlaceholder('emailTemplate4', DEFAULT_EMAIL_TEMPLATES.second_reminder.body);
 
   setIfEmpty('emailSubject5', DEFAULT_EMAIL_TEMPLATES.firm_reminder.subject);
   setIfEmpty('emailTemplate5', DEFAULT_EMAIL_TEMPLATES.firm_reminder.body);
+  setPlaceholder('emailSubject5', DEFAULT_EMAIL_TEMPLATES.firm_reminder.subject);
+  setPlaceholder('emailTemplate5', DEFAULT_EMAIL_TEMPLATES.firm_reminder.body);
 
   setIfEmpty('emailSubject6', DEFAULT_EMAIL_TEMPLATES.fourth_reminder.subject);
   setIfEmpty('emailTemplate6', DEFAULT_EMAIL_TEMPLATES.fourth_reminder.body);
+  setPlaceholder('emailSubject6', DEFAULT_EMAIL_TEMPLATES.fourth_reminder.subject);
+  setPlaceholder('emailTemplate6', DEFAULT_EMAIL_TEMPLATES.fourth_reminder.body);
 
   setIfEmpty('emailSubject7', DEFAULT_EMAIL_TEMPLATES.final_notice.subject);
   setIfEmpty('emailTemplate7', DEFAULT_EMAIL_TEMPLATES.final_notice.body);
+  setPlaceholder('emailSubject7', DEFAULT_EMAIL_TEMPLATES.final_notice.subject);
+  setPlaceholder('emailTemplate7', DEFAULT_EMAIL_TEMPLATES.final_notice.body);
 }
 
 function loadSMSTemplates() {
