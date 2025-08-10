@@ -306,10 +306,12 @@ async function startServer() {
 
     // Initialize scheduled jobs only after successful start
     try {
-      require('./services/scheduler');
-      logger.info('Scheduler initialised successfully');
+      const { startScheduler } = require('./services/followUpScheduler');
+      // Run follow-up processing every 5 minutes (24/7)
+      startScheduler({ followUpProcessing: '*/5 * * * *' });
+      logger.info('Follow-up scheduler initialised successfully');
     } catch (schedErr) {
-      logger.error('Scheduler failed to initialise', { error: schedErr });
+      logger.error('Follow-up scheduler failed to initialise', { error: schedErr });
       // Do NOT crash the whole app – core API can still function without scheduler
     }
   } catch (error) {
