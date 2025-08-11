@@ -16,6 +16,7 @@ const { applySecurityMiddleware } = require('./backend/middleware/securityMiddle
 const cookieParser = require('cookie-parser');   // <-- added
 const { optionalAuth } = require('./backend/middleware/jwtAuthMiddleware'); // new import
 const jwtService   = require('./backend/services/jwtService'); // JWT verification
+const secrets      = require('./backend/config/secrets');
 
 // ---------------------------------------------------------------------------
 // QuickBooks controller (optional)
@@ -69,10 +70,23 @@ const app = express();
 applySecurityMiddleware(app);
 
 // CORS configuration
+const PROD_DOMAIN_REGEX = /^https?:\/\/([a-z0-9-]+\.)*collectflo\.com$/i;
+const allowedOrigins = Array.isArray(secrets.security?.corsAllowedOrigins)
+  ? secrets.security.corsAllowedOrigins
+  : [];
+
 app.use(cors({
-  origin: IS_PRODUCTION ? 
-    ['https://collectflo.com', /\.collectflo\.com$/] : 
-    'http://localhost:3000',
+  origin: (origin, callback) => {
+    // Allow non-browser or same-origin requests (no Origin header)
+    if (!origin) return callback(null, true);
+
+    const explicitlyAllowed = allowedOrigins.includes(origin);
+    const prodAllowed = IS_PRODUCTION && PROD_DOMAIN_REGEX.test(origin);
+
+    if (explicitlyAllowed || prodAllowed) return callback(null, true);
+
+    return callback(new Error('CORS: Origin not allowed'), false);
+  },
   credentials: true
 }));
 
