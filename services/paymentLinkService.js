@@ -17,26 +17,48 @@ const logger = require('../backend/services/logger');
 async function generateQuickBooksPaymentLink(invoiceId, userId) {
   try {
     // Get QuickBooks tokens
-    const tokens = await getValidTokens(userId);
-    if (!tokens || !tokens.access_token) {
+    let tokens = await getValidTokens(userId);
+    if (!tokens || !tokens.access_token || !tokens.realmId) {
       throw new Error('QuickBooks tokens not available');
     }
 
     // Determine API URL
-    const apiBaseUrl = secrets.qbo.environment === 'production'
-      ? 'https://quickbooks.api.intuit.com/v3/company/'
-      : 'https://sandbox-quickbooks.api.intuit.com/v3/company/';
+    const apiBaseUrl = secrets.qbo.apiUrl;
+
+    // Helper to perform GET with retry on 401
+    const doGet = async (url) => {
+      try {
+        const resp = await axios.get(url, {
+          params: { minorversion: 65 },
+          headers: {
+            'Authorization': `Bearer ${tokens.access_token}`,
+            'Accept': 'application/json'
+          }
+        });
+        return resp;
+      } catch (err) {
+        if (err.response?.status === 401) {
+          try {
+            const { refreshAccessToken } = require('./tokenRefresh');
+            tokens = await refreshAccessToken(userId);
+            const retry = await axios.get(url, {
+              params: { minorversion: 65 },
+              headers: {
+                'Authorization': `Bearer ${tokens.access_token}`,
+                'Accept': 'application/json'
+              }
+            });
+            return retry;
+          } catch (_) {
+            throw err;
+          }
+        }
+        throw err;
+      }
+    };
 
     // First, get the invoice details to ensure it exists
-    const invoiceResponse = await axios.get(
-      `${apiBaseUrl}${tokens.realmId}/query?query=SELECT * FROM Invoice WHERE Id = '${invoiceId}'`,
-      {
-        headers: {
-          'Authorization': `Bearer ${tokens.access_token}`,
-          'Accept': 'application/json'
-        }
-      }
-    );
+    const invoiceResponse = await doGet(`${apiBaseUrl}${tokens.realmId}/query?query=SELECT * FROM Invoice WHERE Id = '${invoiceId}'`);
 
     const invoices = invoiceResponse.data.QueryResponse?.Invoice || [];
     if (invoices.length === 0) {
@@ -139,25 +161,46 @@ function generateSecureToken(invoiceId, userId) {
  */
 async function getInvoicePaymentStatus(invoiceId, userId) {
   try {
-    const tokens = await getValidTokens(userId);
-    if (!tokens || !tokens.access_token) {
+    let tokens = await getValidTokens(userId);
+    if (!tokens || !tokens.access_token || !tokens.realmId) {
       throw new Error('QuickBooks tokens not available');
     }
 
-    const apiBaseUrl = secrets.qbo.environment === 'production'
-      ? 'https://quickbooks.api.intuit.com/v3/company/'
-      : 'https://sandbox-quickbooks.api.intuit.com/v3/company/';
+    const apiBaseUrl = secrets.qbo.apiUrl;
+
+    const doGet = async (url) => {
+      try {
+        const resp = await axios.get(url, {
+          params: { minorversion: 65 },
+          headers: {
+            'Authorization': `Bearer ${tokens.access_token}`,
+            'Accept': 'application/json'
+          }
+        });
+        return resp;
+      } catch (err) {
+        if (err.response?.status === 401) {
+          try {
+            const { refreshAccessToken } = require('./tokenRefresh');
+            tokens = await refreshAccessToken(userId);
+            const retry = await axios.get(url, {
+              params: { minorversion: 65 },
+              headers: {
+                'Authorization': `Bearer ${tokens.access_token}`,
+                'Accept': 'application/json'
+              }
+            });
+            return retry;
+          } catch (_) {
+            throw err;
+          }
+        }
+        throw err;
+      }
+    };
 
     // Get current invoice status
-    const response = await axios.get(
-      `${apiBaseUrl}${tokens.realmId}/query?query=SELECT Balance, TotalAmt FROM Invoice WHERE Id = '${invoiceId}'`,
-      {
-        headers: {
-          'Authorization': `Bearer ${tokens.access_token}`,
-          'Accept': 'application/json'
-        }
-      }
-    );
+    const response = await doGet(`${apiBaseUrl}${tokens.realmId}/query?query=SELECT Balance, TotalAmt FROM Invoice WHERE Id = '${invoiceId}'`);
 
     const invoices = response.data.QueryResponse?.Invoice || [];
     if (invoices.length === 0) {

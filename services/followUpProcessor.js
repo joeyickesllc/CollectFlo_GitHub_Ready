@@ -18,49 +18,63 @@ const axios = require('axios');
 async function fetchInvoiceFromQuickBooks(invoiceId, userId) {
   try {
     // Get QuickBooks tokens
-    const tokens = await getValidTokens(userId);
-    if (!tokens || !tokens.access_token) {
+    let tokens = await getValidTokens(userId);
+    if (!tokens || !tokens.access_token || !tokens.realmId) {
       throw new Error('QuickBooks tokens not available');
     }
 
     // Determine API URL
-    const apiBaseUrl = secrets.qbo.environment === 'production'
-      ? 'https://quickbooks.api.intuit.com/v3/company/'
-      : 'https://sandbox-quickbooks.api.intuit.com/v3/company/';
+    const apiBaseUrl = secrets.qbo.apiUrl; // includes trailing '/'
+
+    // Helper to perform GET with retry on 401
+    const doGet = async (url) => {
+      try {
+        const resp = await axios.get(url, {
+          params: { minorversion: 65 },
+          headers: {
+            'Authorization': `Bearer ${tokens.access_token}`,
+            'Accept': 'application/json'
+          }
+        });
+        return resp;
+      } catch (err) {
+        if (err.response?.status === 401) {
+          try {
+            const { refreshAccessToken } = require('./tokenRefresh');
+            tokens = await refreshAccessToken(userId);
+            const retry = await axios.get(url, {
+              params: { minorversion: 65 },
+              headers: {
+                'Authorization': `Bearer ${tokens.access_token}`,
+                'Accept': 'application/json'
+              }
+            });
+            return retry;
+          } catch (_) {
+            throw err;
+          }
+        }
+        throw err;
+      }
+    };
 
     // Try direct GET for Invoice by Id
-    const response = await axios.get(
-      `${apiBaseUrl}${tokens.realmId}/invoice/${invoiceId}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${tokens.access_token}`,
-          'Accept': 'application/json'
-        }
-      }
-    );
+    const response = await doGet(`${apiBaseUrl}${tokens.realmId}/invoice/${invoiceId}`);
 
     // Direct entity GET returns the entity at the top-level key (Invoice)
-    const directInvoice = response.data?.Invoice;
+    const directInvoice = response.data?.Invoice || response.data?.QueryResponse?.Invoice?.[0];
     if (directInvoice) {
       return directInvoice;
     }
 
     // Fallback to query API
-    const queryResponse = await axios.get(
-      `${apiBaseUrl}${tokens.realmId}/query?query=SELECT * FROM Invoice WHERE Id = '${invoiceId}'`,
-      {
-        headers: {
-          'Authorization': `Bearer ${tokens.access_token}`,
-          'Accept': 'application/json'
-        }
-      }
-    );
-    
+    const queryResponse = await doGet(`${apiBaseUrl}${tokens.realmId}/query?query=SELECT * FROM Invoice WHERE Id = '${invoiceId}'`);
+
     const invoices = queryResponse.data.QueryResponse?.Invoice || [];
     if (invoices.length === 0) {
       throw new Error(`Invoice ${invoiceId} not found in QuickBooks`);
     }
-    
+
     return invoices[0];
   } catch (error) {
     logger.error('Error fetching invoice from QuickBooks', {
@@ -95,14 +109,19 @@ async function processFollowUp(followUp) {
       companyId: followUp.company_id
     });
 
-    // Get user for this company to fetch QuickBooks data
+    // Get a user for this company that has QBO tokens
     const user = await db.queryOne(
-      'SELECT id FROM users WHERE company_id = $1 ORDER BY id LIMIT 1',
+      `SELECT u.id
+         FROM users u
+         JOIN qbo_tokens qt ON qt.user_id = u.id
+        WHERE u.company_id = $1
+        ORDER BY qt.updated_at DESC
+        LIMIT 1`,
       [followUp.company_id]
     );
 
     if (!user) {
-      throw new Error('No user found for company');
+      throw new Error('No QuickBooks-connected user found for company');
     }
 
     // Fetch invoice details from QuickBooks
@@ -129,29 +148,52 @@ async function processFollowUp(followUp) {
     // Get customer contact information
     let customerEmail = null;
     let customerPhone = null;
-    
+
     if (invoice.CustomerRef?.value) {
       try {
         // Get QuickBooks tokens
-        const tokens = await getValidTokens(user.id);
-        if (tokens?.access_token) {
-          const apiBaseUrl = secrets.qbo.environment === 'production'
-            ? 'https://quickbooks.api.intuit.com/v3/company/'
-            : 'https://sandbox-quickbooks.api.intuit.com/v3/company/';
+        let tokens = await getValidTokens(user.id);
+        if (tokens?.access_token && tokens?.realmId) {
+          const apiBaseUrl = secrets.qbo.apiUrl;
+
+          const doGetCustomer = async (url) => {
+            try {
+              const resp = await axios.get(url, {
+                params: { minorversion: 65 },
+                headers: {
+                  'Authorization': `Bearer ${tokens.access_token}`,
+                  'Accept': 'application/json'
+                }
+              });
+              return resp;
+            } catch (err) {
+              if (err.response?.status === 401) {
+                try {
+                  const { refreshAccessToken } = require('./tokenRefresh');
+                  tokens = await refreshAccessToken(user.id);
+                  const retry = await axios.get(url, {
+                    params: { minorversion: 65 },
+                    headers: {
+                      'Authorization': `Bearer ${tokens.access_token}`,
+                      'Accept': 'application/json'
+                    }
+                  });
+                  return retry;
+                } catch (_) {
+                  throw err;
+                }
+              }
+              throw err;
+            }
+          };
 
           // Fetch customer details
-          const customerResponse = await axios.get(
-            `${apiBaseUrl}${tokens.realmId}/customer/${invoice.CustomerRef.value}`,
-            {
-              headers: {
-                'Authorization': `Bearer ${tokens.access_token}`,
-                'Accept': 'application/json'
-              }
-            }
+          const customerResponse = await doGetCustomer(
+            `${apiBaseUrl}${tokens.realmId}/customer/${invoice.CustomerRef.value}`
           );
 
           // Direct entity GET returns Customer at top-level
-          const customer = customerResponse.data?.Customer;
+          const customer = customerResponse.data?.Customer || customerResponse.data?.QueryResponse?.Customer?.[0];
           if (customer) {
             customerEmail = customer.PrimaryEmailAddr?.Address || null;
             customerPhone = customer.PrimaryPhone?.FreeFormNumber || customer.Mobile?.FreeFormNumber || null;
