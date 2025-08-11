@@ -118,7 +118,7 @@ async function updateInvoices() {
 }
 
 // Toggle invoice exclusion
-async function toggleInvoiceExclusion(invoiceId, isIncluded) {
+window.toggleInvoiceExclusion = async function (invoiceId, isIncluded) {
   try {
     const response = await fetch('/api/invoices/toggle-exclusion', {
       method: 'POST',
@@ -147,7 +147,7 @@ async function toggleInvoiceExclusion(invoiceId, isIncluded) {
     // Revert checkbox state on error
     updateInvoices();
   }
-}
+};
 
 // Initialize dashboard
 async function initializeDashboard() {
@@ -236,68 +236,10 @@ async function loadDashboardStats() {
 }
 
 // Load invoices list
-async function loadInvoices() {
-  try {
-    const response = await fetch('/api/invoices', {
-      method: 'GET',
-      credentials: 'include'
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const invoices = await response.json();
-    const tableBody = document.getElementById('invoices-table-body');
-
-    if (invoices.length === 0) {
-      tableBody.innerHTML = `
-        <tr>
-          <td colspan="6" class="px-6 py-4 text-center text-gray-500">
-            No outstanding invoices found. <a href="/settings" class="text-blue-600 hover:underline">Connect QuickBooks</a> to import invoices.
-          </td>
-        </tr>
-      `;
-      return;
-    }
-
-    tableBody.innerHTML = invoices.map(invoice => `
-      <tr>
-        <td class="px-6 py-4 text-sm text-gray-900">${invoice.invoice_id}</td>
-        <td class="px-6 py-4 text-sm text-gray-900">${invoice.customer_name || 'Unknown'}</td>
-        <td class="px-6 py-4 text-sm text-gray-900">${new Date(invoice.due_date).toLocaleDateString()}</td>
-        <td class="px-6 py-4 text-sm text-gray-900">$${(invoice.balance || 0).toLocaleString()}</td>
-        <td class="px-6 py-4 text-sm">
-          <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-            invoice.excluded ? 'bg-gray-100 text-gray-800' : 
-            invoice.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-          }">
-            ${invoice.excluded ? 'Excluded' : invoice.status === 'paid' ? 'Paid' : 'Pending'}
-          </span>
-        </td>
-        <td class="px-6 py-4 text-sm">
-          <button onclick="toggleExclusion('${invoice.invoice_id}', ${!invoice.excluded})" 
-                  class="text-blue-600 hover:text-blue-800">
-            ${invoice.excluded ? 'Include' : 'Exclude'}
-          </button>
-        </td>
-      </tr>
-    `).join('');
-
-  } catch (error) {
-    console.error('Error loading invoices:', error);
-    document.getElementById('invoices-table-body').innerHTML = `
-      <tr>
-        <td colspan="6" class="px-6 py-4 text-center text-red-500">
-          Error loading invoices. Please refresh the page.
-        </td>
-      </tr>
-    `;
-  }
-}
+// [REMOVED DUPLICATE FUNCTION loadInvoices THAT WROTE TO invoices-table-body]
 
 // Toggle invoice exclusion
-async function toggleExclusion(invoiceId, excluded) {
+window.toggleExclusion = async function (invoiceId, excluded) {
   try {
     const response = await fetch('/api/invoices/toggle-exclusion', {
       method: 'POST',
@@ -323,53 +265,10 @@ async function toggleExclusion(invoiceId, excluded) {
     console.error('Error toggling exclusion:', error);
     alert('Failed to update invoice status. Please try again.');
   }
-}
-// Load dashboard data
-async function loadDashboard() {
-    try {
-        // Check authentication first
-        const userResponse = await fetch('/api/user-info');
-        if (!userResponse.ok) {
-            console.log('User not authenticated, status:', userResponse.status);
-            window.location.href = '/login';
-            return;
-        }
+};
+// Load dashboard data (unused legacy function removed)
 
-        const user = await userResponse.json();
-        console.log('User authenticated:', user.email);
-
-        // Update user info in nav if available
-        if (typeof updateUserInfo === 'function') {
-            updateUserInfo(user);
-        }
-
-        // Load dashboard stats
-        await loadStats();
-
-        // Load invoices
-        await loadInvoices();
-    } catch (error) {
-        console.error('Dashboard loading error:', error);
-        window.location.href = '/login';
-    }
-}
-
-// Load dashboard statistics
-async function loadStats() {
-    try {
-        const response = await fetch('/api/dashboard/stats');
-        if (response.ok) {
-            const stats = await response.json();
-
-            document.getElementById('total-followups').textContent = stats.total || 0;
-            document.getElementById('pending-followups').textContent = stats.pending || 0;
-            document.getElementById('delivered-followups').textContent = stats.delivered || 0;
-            document.getElementById('outstanding-amount').textContent = `$${(stats.outstanding || 0).toLocaleString()}`;
-        }
-    } catch (error) {
-        console.error('Error loading stats:', error);
-    }
-}
+// Load dashboard statistics (legacy, removed in favor of updateStats())
 
 // Load invoices and follow-ups
 async function loadInvoices() {

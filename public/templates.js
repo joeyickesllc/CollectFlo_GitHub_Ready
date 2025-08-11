@@ -32,4 +32,7 @@ async function saveTemplate(id) {
   });
 }
 
+// Make available to inline onclick handlers
+window.saveTemplate = saveTemplate;
+
 loadTemplates();

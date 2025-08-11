@@ -153,7 +153,7 @@ const DEFAULT_EMAIL_TEMPLATES = {
 I hope you're having a great day. I wanted to give you a friendly heads up that invoice {{invoiceNumber}} is due tomorrow ({{dueDate}}).
 
 Invoice #{{invoiceNumber}}
-Amount Due: ${{amount}}
+Amount Due: $${'{{amount}}'}
 Due Date: {{dueDate}}
 
 Just a quick reminder to help you stay on top of things. If you've already scheduled the payment, you can disregard this message.
@@ -171,7 +171,7 @@ Thanks for being a valued customer!
 I wanted to reach out because invoice {{invoiceNumber}} is due today ({{dueDate}}).
 
 Invoice #{{invoiceNumber}}
-Amount Due: ${{amount}}
+Amount Due: $${'{{amount}}'}
 Due Date: {{dueDate}} (Today)
 
 If you've already sent the payment, please disregard this message. If not, you can pay quickly and securely online.
@@ -189,7 +189,7 @@ Thank you!
 I hope you're doing well. I wanted to reach out regarding invoice {{invoiceNumber}} which was due on {{dueDate}}.
 
 Invoice #{{invoiceNumber}}
-Amount Due: ${{amount}}
+Amount Due: $${'{{amount}}'}
 Due Date: {{dueDate}}
 
 I know things can get busy, so I just wanted to make sure this didn't slip through the cracks. If you've already sent the payment, please disregard this message.
@@ -207,7 +207,7 @@ Thanks so much!
 I'm following up on my previous email about invoice {{invoiceNumber}}. The payment is now {{daysOverdue}} days past due and I haven't received payment or heard back from you.
 
 Invoice #{{invoiceNumber}}
-Amount Due: ${{amount}}
+Amount Due: $${'{{amount}}'}
 Original Due Date: {{dueDate}}
 Days Past Due: {{daysOverdue}} days
 
@@ -226,7 +226,7 @@ I appreciate your prompt attention to this.
 I've sent multiple emails about invoice {{invoiceNumber}} and haven't received payment or any response. This is now seriously overdue and requires immediate attention.
 
 Invoice #{{invoiceNumber}}
-Amount Due: ${{amount}}
+Amount Due: $${'{{amount}}'}
 Due Date: {{dueDate}}
 Days Past Due: {{daysOverdue}} days
 
@@ -250,7 +250,7 @@ Your account is now in serious jeopardy. Invoice {{invoiceNumber}} has been outs
 
 ACCOUNT STATUS: CRITICAL
 Invoice #{{invoiceNumber}}
-Amount Due: ${{amount}}
+Amount Due: $${'{{amount}}'}
 Due Date: {{dueDate}}
 Days Past Due: {{daysOverdue}} days
 
@@ -276,7 +276,7 @@ Invoice {{invoiceNumber}} is now {{daysOverdue}} days past due and I have not re
 
 FINAL DEMAND
 Invoice #{{invoiceNumber}}
-Amount Due: ${{amount}}
+Amount Due: $${'{{amount}}'}
 Due Date: {{dueDate}}
 Days Past Due: {{daysOverdue}} days
 
@@ -295,13 +295,13 @@ I don't want it to come to this. Please call me immediately to avoid legal actio
 };
 
 const DEFAULT_SMS_TEMPLATES = {
-  pre_due_reminder: `Hi {{customerName}}, friendly reminder that invoice {{invoiceNumber}} (${{amount}}) is due tomorrow ({{dueDate}}). Pay online: [payment link] Thanks! - {{companyName}}`,
-  due_date_notice: `Hi {{customerName}}, invoice {{invoiceNumber}} (${{amount}}) is due today. Pay online: [payment link] Thanks! - {{companyName}}`,
-  gentle_reminder: `Hi {{customerName}}, hope you're well. Just a reminder that invoice {{invoiceNumber}} (${{amount}}) was due {{daysOverdue}} days ago. Please send payment when you get a chance. Thanks! - {{companyName}}`,
-  second_reminder: `Hi {{customerName}}, following up on invoice {{invoiceNumber}} (${{amount}}) - it's {{daysOverdue}} days past due. I need to get this resolved soon. Can you send payment today? Call me if any issues. - {{companyName}}`,
-  firm_reminder: `{{customerName}}, I haven't received payment for invoice {{invoiceNumber}} (${{amount}}, {{daysOverdue}} days overdue). I need payment in 48 hours to avoid escalation. Please call me today. - {{companyName}}`,
-  fourth_reminder: `{{customerName}}, CRITICAL: Invoice {{invoiceNumber}} (${{amount}}) is {{daysOverdue}} days overdue. Account in jeopardy. PAY IMMEDIATELY: [payment link] Call NOW to avoid legal action. - {{companyName}}`,
-  final_notice: `{{customerName}}, FINAL NOTICE: Invoice {{invoiceNumber}} (${{amount}}) is {{daysOverdue}} days overdue. I must receive payment in 7 days or turn this over to legal. Please call me now. - {{companyName}}`
+  pre_due_reminder: `Hi {{customerName}}, friendly reminder that invoice {{invoiceNumber}} ($${'{{amount}}'}) is due tomorrow ({{dueDate}}). Pay online: [payment link] Thanks! - {{companyName}}`,
+  due_date_notice: `Hi {{customerName}}, invoice {{invoiceNumber}} ($${'{{amount}}'}) is due today. Pay online: [payment link] Thanks! - {{companyName}}`,
+  gentle_reminder: `Hi {{customerName}}, hope you're well. Just a reminder that invoice {{invoiceNumber}} ($${'{{amount}}'}) was due {{daysOverdue}} days ago. Please send payment when you get a chance. Thanks! - {{companyName}}`,
+  second_reminder: `Hi {{customerName}}, following up on invoice {{invoiceNumber}} ($${'{{amount}}'}) - it's {{daysOverdue}} days past due. I need to get this resolved soon. Can you send payment today? Call me if any issues. - {{companyName}}`,
+  firm_reminder: `{{customerName}}, I haven't received payment for invoice {{invoiceNumber}} ($${'{{amount}}'}, {{daysOverdue}} days overdue). I need payment in 48 hours to avoid escalation. Please call me today. - {{companyName}}`,
+  fourth_reminder: `{{customerName}}, CRITICAL: Invoice {{invoiceNumber}} ($${'{{amount}}'}) is {{daysOverdue}} days overdue. Account in jeopardy. PAY IMMEDIATELY: [payment link] Call NOW to avoid legal action. - {{companyName}}`,
+  final_notice: `{{customerName}}, FINAL NOTICE: Invoice {{invoiceNumber}} ($${'{{amount}}'}) is {{daysOverdue}} days overdue. I must receive payment in 7 days or turn this over to legal. Please call me now. - {{companyName}}`
 };
 
 const DEFAULT_FOLLOWUP_RULES = [
@@ -440,11 +440,11 @@ function setupCharacterCounters() {
     const textarea = document.getElementById(`smsTemplate${i}`);
     const counter = document.getElementById(`smsCount${i}`);
     
-    function updateCounter() {
+    const updateCounter = () => {
       const count = textarea.value.length;
       counter.textContent = count;
       counter.className = count > 320 ? 'text-red-500' : count > 160 ? 'text-yellow-500' : 'text-gray-500';
-    }
+    };
     
     textarea.addEventListener('input', updateCounter);
     updateCounter();
@@ -454,18 +454,18 @@ function setupCharacterCounters() {
 // Follow-up rules management
 let currentRules = [...DEFAULT_FOLLOWUP_RULES];
 
-function toggleRule(index) {
+window.toggleRule = function (index) {
   currentRules[index].active = !currentRules[index].active;
-}
+};
 
-function updateRule(index, field, value) {
+window.updateRule = function (index, field, value) {
   currentRules[index][field] = value;
-}
+};
 
-function removeRule(index) {
+window.removeRule = function (index) {
   currentRules.splice(index, 1);
   displayFollowUpRules(currentRules);
-}
+};
 
 document.getElementById('addRuleBtn').addEventListener('click', () => {
   currentRules.push({
