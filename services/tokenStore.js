@@ -25,27 +25,14 @@ const IV_LENGTH = 16; // For AES, this is always 16 bytes
  */
 function encrypt(text) {
   try {
-    // Use session secret as encryption key (hash it to get correct length)
     const sessionSecret = secrets.app.sessionSecret;
     const key = crypto.createHash('sha256').update(sessionSecret).digest();
     const iv = crypto.randomBytes(IV_LENGTH);
     const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, key, iv);
     
-    // Log SESSION_SECRET info for debugging (first/last 4 chars only for security)
-    logger.info('Token encryption SESSION_SECRET', {
-      secretStart: sessionSecret ? sessionSecret.substring(0, 4) : 'null',
-      secretEnd: sessionSecret ? sessionSecret.substring(sessionSecret.length - 4) : 'null',
-      secretLength: sessionSecret ? sessionSecret.length : 0,
-      secretExists: !!sessionSecret,
-      keyHash: key.toString('hex').substring(0, 8) + '...',
-      fullKeyHash: crypto.createHash('sha256').update(key).digest('hex').substring(0, 16),
-      processEnvSecret: process.env.SESSION_SECRET ? process.env.SESSION_SECRET.substring(0, 4) + '...' + process.env.SESSION_SECRET.substring(process.env.SESSION_SECRET.length - 4) : 'undefined'
-    });
-    
     let encrypted = cipher.update(text, 'utf8', 'hex');
     encrypted += cipher.final('hex');
     
-    // In GCM mode, we need to get the auth tag for decryption
     const authTag = cipher.getAuthTag();
     
     return {
@@ -72,17 +59,6 @@ function decrypt(encData) {
     const iv = Buffer.from(encData.iv, 'hex');
     const authTag = Buffer.from(encData.authTag, 'hex');
     
-    // Log SESSION_SECRET info for debugging (first/last 4 chars only for security)
-    logger.info('Token decryption SESSION_SECRET', {
-      secretStart: sessionSecret ? sessionSecret.substring(0, 4) : 'null',
-      secretEnd: sessionSecret ? sessionSecret.substring(sessionSecret.length - 4) : 'null',
-      secretLength: sessionSecret ? sessionSecret.length : 0,
-      secretExists: !!sessionSecret,
-      keyHash: key.toString('hex').substring(0, 8) + '...',
-      fullKeyHash: crypto.createHash('sha256').update(key).digest('hex').substring(0, 16),
-      processEnvSecret: process.env.SESSION_SECRET ? process.env.SESSION_SECRET.substring(0, 4) + '...' + process.env.SESSION_SECRET.substring(process.env.SESSION_SECRET.length - 4) : 'undefined'
-    });
-    
     const decipher = crypto.createDecipheriv(ENCRYPTION_ALGORITHM, key, iv);
     decipher.setAuthTag(authTag);
     
@@ -91,11 +67,7 @@ function decrypt(encData) {
     
     return decrypted;
   } catch (error) {
-    logger.error('Token decryption failed', { 
-      error: error.message,
-      secretExists: !!secrets.app.sessionSecret,
-      secretLength: secrets.app.sessionSecret ? secrets.app.sessionSecret.length : 0
-    });
+    logger.error('Token decryption failed', { error: error.message });
     throw new Error('Failed to decrypt token data');
   }
 }
@@ -165,7 +137,6 @@ async function saveTokens(tokens, userId = null) {
  */
 async function getTokens(userId = null) {
   try {
-    // Get the encrypted tokens from the database
     const result = await db.query(
       `SELECT encrypted_tokens, iv, auth_tag
          FROM qbo_tokens
@@ -175,58 +146,23 @@ async function getTokens(userId = null) {
       [userId]
     );
     
-    // The db wrapper returns rows directly, not { rows: [...] }
     const rows = result || [];
     const tokenData = rows[0];
-    
-    logger.info('Database token query result', {
-      userId,
-      rowsLength: rows.length,
-      hasTokenData: !!tokenData,
-      tokenDataKeys: tokenData ? Object.keys(tokenData) : [],
-      tokenDataValues: tokenData ? {
-        hasEncryptedTokens: !!tokenData.encrypted_tokens,
-        hasIv: !!tokenData.iv,
-        hasAuthTag: !!tokenData.auth_tag,
-        encryptedTokensType: typeof tokenData.encrypted_tokens,
-        ivType: typeof tokenData.iv,
-        authTagType: typeof tokenData.auth_tag
-      } : null
-    });
     
     if (!tokenData) {
       logger.debug('No QBO tokens found for user', { userId });
       return null;
     }
     
-    // Log the token data structure before decryption attempt
-    logger.info('About to decrypt token data', {
-      userId,
-      hasEncryptedTokens: !!tokenData.encrypted_tokens,
-      hasIv: !!tokenData.iv,
-      hasAuthTag: !!tokenData.auth_tag,
-      encryptedLength: tokenData.encrypted_tokens ? tokenData.encrypted_tokens.length : 0,
-      ivLength: tokenData.iv ? tokenData.iv.length : 0,
-      authTagLength: tokenData.auth_tag ? tokenData.auth_tag.length : 0
-    });
-
-    // Decrypt the tokens
     const decrypted = decrypt({
       encrypted: tokenData.encrypted_tokens,
       iv: tokenData.iv,
       authTag: tokenData.auth_tag
     });
     
-    logger.info('Token decryption completed successfully', { userId });
     return JSON.parse(decrypted);
   } catch (error) {
-    logger.error('Failed to retrieve QBO tokens', { 
-      error: error.message, 
-      errorStack: error.stack,
-      userId,
-      tokenDataExists: !!tokenData,
-      tokenDataKeys: tokenData ? Object.keys(tokenData) : []
-    });
+    logger.error('Failed to retrieve QBO tokens', { error: error.message, userId });
     return null;
   }
 }

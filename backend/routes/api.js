@@ -98,6 +98,10 @@ router.use(logger.requestLogger);
  *   • Intended for temporary diagnostics; restrict in production.
  */
 router.get('/auth-debug', async (req, res) => {
+  const isProd = process.env.NODE_ENV === 'production';
+  if (isProd && !process.env.DEBUG_TESTS) {
+    return res.status(404).json({ success: false, message: 'Not found' });
+  }
   const debugPayload = {
     hasToken        : !!(req.cookies?.accessToken || req.headers.authorization),
     isAuthenticated : !!req.user,
@@ -120,7 +124,6 @@ router.get('/auth-debug', async (req, res) => {
     }
   };
 
-  // Attach minimal user info when authenticated
   if (req.user) {
     const { id, email, role } = req.user;
     debugPayload.user = { id, email, role };

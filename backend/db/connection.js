@@ -140,20 +140,28 @@ function initializeDatabase() {
       try {
         params = serializeParams(params);
         const result = await pool.query(text, params);
-        logger.info('DB query success', {
-          text,
-          params,
-          duration: Date.now() - start,
+        const duration = Date.now() - start;
+        const logPayload = {
+          duration,
           rowCount: result.rowCount
-        });
+        };
+        if (!IS_PRODUCTION) {
+          logPayload.text = text;
+          logPayload.params = params;
+        }
+        logger[IS_PRODUCTION ? 'debug' : 'info']('DB query success', logPayload);
         return result.rows;
       } catch (err) {
-        logger.error('Database query error', {
-          text,
-          params,
-          error: err,
-          duration: Date.now() - start
-        });
+        const duration = Date.now() - start;
+        const logPayload = { duration };
+        if (!IS_PRODUCTION) {
+          logPayload.text = text;
+          logPayload.params = params;
+          logPayload.error = err;
+        } else {
+          logPayload.error = err.message;
+        }
+        logger.warn('Database query error', logPayload);
         throw err;
       }
     },
@@ -163,20 +171,25 @@ function initializeDatabase() {
       try {
         params = serializeParams(params);
         const result = await pool.query(text, params);
-        logger.info('DB queryOne success', {
-          text,
-          params,
-          duration: Date.now() - start,
-          found: result.rows.length > 0
-        });
+        const duration = Date.now() - start;
+        const logPayload = { duration, found: result.rows.length > 0 };
+        if (!IS_PRODUCTION) {
+          logPayload.text = text;
+          logPayload.params = params;
+        }
+        logger[IS_PRODUCTION ? 'debug' : 'info']('DB queryOne success', logPayload);
         return result.rows[0] || null;
       } catch (err) {
-        logger.error('Database queryOne error', {
-          text,
-          params,
-          error: err,
-          duration: Date.now() - start
-        });
+        const duration = Date.now() - start;
+        const logPayload = { duration };
+        if (!IS_PRODUCTION) {
+          logPayload.text = text;
+          logPayload.params = params;
+          logPayload.error = err;
+        } else {
+          logPayload.error = err.message;
+        }
+        logger.warn('Database queryOne error', logPayload);
         throw err;
       }
     },
@@ -186,23 +199,28 @@ function initializeDatabase() {
       try {
         params = serializeParams(params);
         const result = await pool.query(text, params);
-        logger.info('DB execute success', {
-          text,
-          params,
-          duration: Date.now() - start,
-          rowCount: result.rowCount
-        });
+        const duration = Date.now() - start;
+        const logPayload = { duration, rowCount: result.rowCount };
+        if (!IS_PRODUCTION) {
+          logPayload.text = text;
+          logPayload.params = params;
+        }
+        logger[IS_PRODUCTION ? 'debug' : 'info']('DB execute success', logPayload);
         return {
           rowCount: result.rowCount,
           rows: result.rows
         };
       } catch (err) {
-        logger.error('Database execute error', {
-          text,
-          params,
-          error: err,
-          duration: Date.now() - start
-        });
+        const duration = Date.now() - start;
+        const logPayload = { duration };
+        if (!IS_PRODUCTION) {
+          logPayload.text = text;
+          logPayload.params = params;
+          logPayload.error = err;
+        } else {
+          logPayload.error = err.message;
+        }
+        logger.warn('Database execute error', logPayload);
         throw err;
       }
     },
