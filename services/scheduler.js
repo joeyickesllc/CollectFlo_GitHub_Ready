@@ -115,8 +115,8 @@ function initScheduler() {
       }
     });
 
-    // Process follow-ups - Every 15 minutes during business hours (9 AM - 6 PM, Monday-Friday)
-    scheduleTask('*/15 9-18 * * 1-5', 'process-followups', async () => {
+    // Process follow-ups - Every 5 minutes (24/7)
+    scheduleTask('*/5 * * * *', 'process-followups', async () => {
       logger.info('Running scheduled follow-up processing');
       try {
         const { processPendingFollowUps } = require('./followUpProcessor');
