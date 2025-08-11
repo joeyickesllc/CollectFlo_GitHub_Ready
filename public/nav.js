@@ -2,7 +2,7 @@
 console.log('Nav.js loading...');
 
 // Global variables
-let authCheckInProgress = false;
+// (removed unused authCheckInProgress)
 
 /**
  * Fetch wrapper with basic retry/back-off.
@@ -171,6 +171,9 @@ async function logout() {
     window.location.href = '/';
   }
 }
+
+// Expose logout for inline onclick usage
+window.logout = logout;
 
 // Should nav even load on this page?
 function shouldLoadNav() {
