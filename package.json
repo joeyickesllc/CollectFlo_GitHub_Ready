@@ -13,7 +13,8 @@
     "dev": "nodemon index.js",
     "lint": "eslint .",
     "migrate": "node-pg-migrate up",
-    "migrate:create": "node-pg-migrate create"
+    "migrate:create": "node-pg-migrate create",
+    "migrate:run": "node backend/scripts/runMigrations"
   },
   "keywords": [
     "invoice",

@@ -130,6 +130,21 @@ router.get('/auth-debug', async (req, res) => {
 });
 
 /**
+ * Restrict debug HTML pages in production by returning 404
+ */
+router.get('/__debug/auth', (req, res) => {
+  const isProd = process.env.NODE_ENV === 'production';
+  if (isProd) return res.status(404).end();
+  res.sendFile(require('path').join(__dirname, '../../public', 'auth-diagnostics.html'));
+});
+
+router.get('/__debug/login', (req, res) => {
+  const isProd = process.env.NODE_ENV === 'production';
+  if (isProd) return res.status(404).end();
+  res.sendFile(require('path').join(__dirname, '../../public', 'login-debug.html'));
+});
+
+/**
  * Return current authenticated user info
  * 
  * Front-end (nav.js) expects `/api/user-info` to return 200 with the
