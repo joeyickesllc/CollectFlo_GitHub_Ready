@@ -29,6 +29,7 @@ services:
       - JOB_TIMEOUT=300000
       - JOB_CONCURRENCY=5
       - TZ=UTC
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
     volumes:
       - app-logs:/app/logs
       - app-uploads:/app/uploads
