@@ -299,7 +299,8 @@ async function getCompanySettings(companyId) {
       [companyId]
     );
     
-    // Use company's actual email and phone as "from" information
+    // Use verified SendGrid sender for fromEmail to avoid sender identity errors
+    // Route replies to the company's actual email if available
     const companyEmail = settings?.reply_to_email || user?.email;
     const companyPhone = settings?.phone;
     const companyName = company?.name || 'Your Company';
@@ -307,8 +308,7 @@ async function getCompanySettings(companyId) {
     return {
       companyName: companyName,
       phone: companyPhone || '[PHONE]',
-      // Use company's actual email as from address for authenticity
-      fromEmail: companyEmail || secrets.sendgrid.fromEmail,
+      fromEmail: secrets.sendgrid.fromEmail,
       fromName: companyName,
       replyToEmail: companyEmail || secrets.sendgrid.fromEmail
     };

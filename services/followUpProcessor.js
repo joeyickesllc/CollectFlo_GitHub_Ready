@@ -23,10 +23,8 @@ async function fetchInvoiceFromQuickBooks(invoiceId, userId) {
       throw new Error('QuickBooks tokens not available');
     }
 
-    // Determine API URL
     const apiBaseUrl = secrets.qbo.apiUrl; // includes trailing '/'
 
-    // Helper to perform GET with retry on 401
     const doGet = async (url) => {
       try {
         const resp = await axios.get(url, {
@@ -39,20 +37,16 @@ async function fetchInvoiceFromQuickBooks(invoiceId, userId) {
         return resp;
       } catch (err) {
         if (err.response?.status === 401) {
-          try {
-            const { refreshAccessToken } = require('./tokenRefresh');
-            tokens = await refreshAccessToken(userId);
-            const retry = await axios.get(url, {
-              params: { minorversion: 65 },
-              headers: {
-                'Authorization': `Bearer ${tokens.access_token}`,
-                'Accept': 'application/json'
-              }
-            });
-            return retry;
-          } catch (_) {
-            throw err;
-          }
+          const { refreshAccessToken } = require('./tokenRefresh');
+          tokens = await refreshAccessToken(userId);
+          const retry = await axios.get(url, {
+            params: { minorversion: 65 },
+            headers: {
+              'Authorization': `Bearer ${tokens.access_token}`,
+              'Accept': 'application/json'
+            }
+          });
+          return retry;
         }
         throw err;
       }
@@ -60,8 +54,6 @@ async function fetchInvoiceFromQuickBooks(invoiceId, userId) {
 
     // Try direct GET for Invoice by Id
     const response = await doGet(`${apiBaseUrl}${tokens.realmId}/invoice/${invoiceId}`);
-
-    // Direct entity GET returns the entity at the top-level key (Invoice)
     const directInvoice = response.data?.Invoice || response.data?.QueryResponse?.Invoice?.[0];
     if (directInvoice) {
       return directInvoice;
@@ -69,10 +61,13 @@ async function fetchInvoiceFromQuickBooks(invoiceId, userId) {
 
     // Fallback to query API
     const queryResponse = await doGet(`${apiBaseUrl}${tokens.realmId}/query?query=SELECT * FROM Invoice WHERE Id = '${invoiceId}'`);
-
     const invoices = queryResponse.data.QueryResponse?.Invoice || [];
     if (invoices.length === 0) {
-      throw new Error(`Invoice ${invoiceId} not found in QuickBooks`);
+      // Last fallback: DocNumber
+      const byDoc = await doGet(`${apiBaseUrl}${tokens.realmId}/query?query=SELECT * FROM Invoice WHERE DocNumber = '${invoiceId}'`);
+      const byDocInvoices = byDoc.data.QueryResponse?.Invoice || [];
+      if (byDocInvoices.length === 0) throw new Error(`Invoice ${invoiceId} not found in QuickBooks`);
+      return byDocInvoices[0];
     }
 
     return invoices[0];
