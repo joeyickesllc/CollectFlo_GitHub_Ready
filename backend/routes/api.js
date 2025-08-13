@@ -865,24 +865,47 @@ router.get('/follow-ups/scheduler/status', requireAuth, async (req, res, next) =
 router.post('/test-email', requireAuth, async (req, res, next) => {
   try {
     const { toEmail, testData } = req.body;
-    
+
     if (!toEmail) {
       return res.status(400).json({
         success: false,
         message: 'toEmail is required'
       });
     }
-    
+
+    // Look up the authenticated user's company to personalise templates
+    let companyId = testData?.companyId;
+    try {
+      if (!companyId) {
+        const userCompany = await db.queryOne(
+          'SELECT company_id FROM users WHERE id = $1',
+          [req.user.id]
+        );
+        companyId = userCompany?.company_id || 1;
+      }
+    } catch (lookupErr) {
+      // If lookup fails, fall back to default
+      companyId = 1;
+    }
+
+    // Dynamically import the email service so missing SendGrid config doesn't crash app startup
     const { sendTestFollowUpEmail } = require('../../services/emailService');
-    const result = await sendTestFollowUpEmail(toEmail, testData);
-    
-    res.json({
+    const result = await sendTestFollowUpEmail(toEmail, { ...testData, companyId });
+
+    return res.json({
       success: true,
       message: 'Test email sent successfully',
       result
     });
   } catch (error) {
-    next(error);
+    // Return a more helpful error payload to assist troubleshooting in the UI
+    const details = error?.response?.body || error?.body || undefined;
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to send test email',
+      error: error.message,
+      ...(details && { details })
+    });
   }
 });
 
