@@ -948,7 +948,7 @@ router.get('/setup-qbo-table', async (req, res) => {
     await db.query(`
       CREATE TABLE public.qbo_tokens (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
         encrypted_tokens TEXT NOT NULL,
         iv TEXT NOT NULL,
         auth_tag TEXT NOT NULL,
