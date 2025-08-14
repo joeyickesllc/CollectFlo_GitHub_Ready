@@ -11,7 +11,7 @@ exports.up = async (pgm) => {
   if (!qboTableExists.rows[0].exists) {
     pgm.createTable('qbo_tokens', {
       id: 'id',
-      user_id: { type: 'integer', references: 'users(id)', onDelete: 'CASCADE' },
+      user_id: { type: 'bigint', references: 'users(id)', onDelete: 'CASCADE' },
       encrypted_tokens: { type: 'text', notNull: true },
       iv: { type: 'text', notNull: true },
       auth_tag: { type: 'text', notNull: true },
