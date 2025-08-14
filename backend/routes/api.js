@@ -926,6 +926,16 @@ router.post('/test-sms', requireAuth, async (req, res, next) => {
  */
 router.get('/setup-qbo-table', async (req, res) => {
   try {
+    // Guard: only allow in non-production or if explicitly enabled
+    const isProduction = process.env.NODE_ENV === 'production';
+    const allowSetup = process.env.ALLOW_SETUP_QBO_TABLE === 'true';
+    if (isProduction && !allowSetup) {
+      return res.status(403).json({
+        success: false,
+        message: 'This endpoint is disabled in production. Set ALLOW_SETUP_QBO_TABLE=true to enable temporarily.'
+      });
+    }
+
     // Check table existence
     const { rows } = await db.query(
       `SELECT EXISTS (
