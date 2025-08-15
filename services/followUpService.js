@@ -241,7 +241,7 @@ async function processOverdueInvoices(companyId = null) {
     // Get all companies or specific company
     const companies = companyId 
       ? [{ id: companyId }]
-      : await db.query('SELECT id FROM companies WHERE is_beta = true OR id IN (SELECT company_id FROM qbo_tokens)');
+      : await db.query("SELECT id FROM companies c WHERE is_beta = true OR EXISTS (SELECT 1 FROM users u JOIN qbo_tokens qt ON qt.user_id = u.id WHERE u.company_id = c.id)");
     
     let totalInvoicesProcessed = 0;
     let totalFollowUpsCreated = 0;

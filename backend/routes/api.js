@@ -949,6 +949,16 @@ router.post('/test-sms', requireAuth, async (req, res, next) => {
  */
 router.get('/setup-qbo-table', async (req, res) => {
   try {
+    // Guard: only allow in non-production or if explicitly enabled
+    const isProduction = process.env.NODE_ENV === 'production';
+    const allowSetup = process.env.ALLOW_SETUP_QBO_TABLE === 'true';
+    if (isProduction && !allowSetup) {
+      return res.status(403).json({
+        success: false,
+        message: 'This endpoint is disabled in production. Set ALLOW_SETUP_QBO_TABLE=true to enable temporarily.'
+      });
+    }
+
     // Check table existence
     const { rows } = await db.query(
       `SELECT EXISTS (
@@ -971,7 +981,7 @@ router.get('/setup-qbo-table', async (req, res) => {
     await db.query(`
       CREATE TABLE public.qbo_tokens (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
         encrypted_tokens TEXT NOT NULL,
         iv TEXT NOT NULL,
         auth_tag TEXT NOT NULL,
