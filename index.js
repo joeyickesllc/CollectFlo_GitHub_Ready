@@ -121,7 +121,7 @@ if (IS_PRODUCTION) {
 }
 
 // Special raw body handling for Stripe webhooks (must be before express.json())
-app.use('/api/stripe-webhook', express.raw({ type: 'application/json' }));
+app.use('/stripe-webhook', express.raw({ type: 'application/json' }));
 
 // Body parsing middleware
 app.use(express.json());
@@ -207,6 +207,203 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api/auth-debug', optionalAuth);
 
 app.use('/api', apiRoutes);
+
+// ---------------------------------------------------------------------------
+// Stripe Webhook Route (matches existing Stripe dashboard configuration)
+// ---------------------------------------------------------------------------
+app.post('/stripe-webhook', async (req, res) => {
+  try {
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    const logger = require('./backend/services/logger');
+    const db = require('./backend/db/connection');
+    
+    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    const sig = req.headers['stripe-signature'];
+    let event;
+
+    try {
+      event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+    } catch (err) {
+      logger.error('Stripe webhook signature verification failed', { error: err.message });
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    // Handle the event
+    switch (event.type) {
+      case 'checkout.session.completed':
+        await handleSuccessfulPayment(event.data.object, db, logger);
+        break;
+        
+      case 'customer.subscription.created':
+        await handleSubscriptionCreated(event.data.object, db, logger);
+        break;
+        
+      case 'customer.subscription.updated':
+        await handleSubscriptionUpdated(event.data.object, db, logger);
+        break;
+        
+      case 'customer.subscription.deleted':
+        await handleSubscriptionCancelled(event.data.object, db, logger);
+        break;
+        
+      case 'invoice.payment_failed':
+        await handlePaymentFailed(event.data.object, db, logger);
+        break;
+
+      default:
+        logger.debug('Unhandled Stripe webhook event type', { type: event.type });
+    }
+
+    return res.status(200).json({ received: true });
+
+  } catch (error) {
+    const logger = require('./backend/services/logger');
+    logger.error('Error processing Stripe webhook', { error: error.message });
+    return res.status(500).json({ success: false, message: 'Webhook processing failed' });
+  }
+});
+
+// Webhook helper functions
+async function handleSuccessfulPayment(session, db, logger) {
+  try {
+    const userId = session.client_reference_id;
+    const customerEmail = session.customer_email;
+    
+    if (!userId) {
+      logger.error('No user ID in successful payment session', { sessionId: session.id });
+      return;
+    }
+
+    await db.execute(
+      'UPDATE users SET subscription_status = $1, subscription_start_date = $2 WHERE id = $3',
+      ['active', new Date(), userId]
+    );
+
+    logger.info('User subscription activated', {
+      userId,
+      sessionId: session.id,
+      customerEmail
+    });
+
+  } catch (error) {
+    logger.error('Error handling successful payment', { error: error.message, sessionId: session.id });
+  }
+}
+
+async function handleSubscriptionCreated(subscription, db, logger) {
+  try {
+    const userId = subscription.metadata.user_id;
+    
+    if (!userId) {
+      logger.error('No user ID in subscription metadata', { subscriptionId: subscription.id });
+      return;
+    }
+
+    await db.execute(
+      'UPDATE users SET subscription_status = $1, stripe_subscription_id = $2 WHERE id = $3',
+      ['active', subscription.id, userId]
+    );
+
+    logger.info('Subscription created and linked to user', {
+      userId,
+      subscriptionId: subscription.id
+    });
+
+  } catch (error) {
+    logger.error('Error handling subscription created', { error: error.message, subscriptionId: subscription.id });
+  }
+}
+
+async function handleSubscriptionUpdated(subscription, db, logger) {
+  try {
+    const userId = subscription.metadata.user_id;
+    
+    if (!userId) {
+      logger.error('No user ID in subscription metadata', { subscriptionId: subscription.id });
+      return;
+    }
+
+    let status = 'active';
+    if (subscription.status === 'canceled') {
+      status = 'cancelled';
+    } else if (subscription.status === 'past_due') {
+      status = 'past_due';
+    }
+
+    await db.execute(
+      'UPDATE users SET subscription_status = $1 WHERE id = $2',
+      [status, userId]
+    );
+
+    logger.info('Subscription status updated', {
+      userId,
+      subscriptionId: subscription.id,
+      newStatus: status
+    });
+
+  } catch (error) {
+    logger.error('Error handling subscription updated', { error: error.message, subscriptionId: subscription.id });
+  }
+}
+
+async function handleSubscriptionCancelled(subscription, db, logger) {
+  try {
+    const userId = subscription.metadata.user_id;
+    
+    if (!userId) {
+      logger.error('No user ID in subscription metadata', { subscriptionId: subscription.id });
+      return;
+    }
+
+    await db.execute(
+      'UPDATE users SET subscription_status = $1 WHERE id = $2',
+      ['cancelled', userId]
+    );
+
+    logger.info('Subscription cancelled', {
+      userId,
+      subscriptionId: subscription.id
+    });
+
+  } catch (error) {
+    logger.error('Error handling subscription cancelled', { error: error.message, subscriptionId: subscription.id });
+  }
+}
+
+async function handlePaymentFailed(invoice, db, logger) {
+  try {
+    const subscriptionId = invoice.subscription;
+    
+    if (!subscriptionId) {
+      logger.error('No subscription ID in failed payment invoice', { invoiceId: invoice.id });
+      return;
+    }
+
+    const user = await db.queryOne(
+      'SELECT id FROM users WHERE stripe_subscription_id = $1',
+      [subscriptionId]
+    );
+
+    if (!user) {
+      logger.error('No user found for failed payment', { subscriptionId });
+      return;
+    }
+
+    await db.execute(
+      'UPDATE users SET subscription_status = $1 WHERE id = $2',
+      ['past_due', user.id]
+    );
+
+    logger.info('Payment failed, user marked as past due', {
+      userId: user.id,
+      subscriptionId,
+      invoiceId: invoice.id
+    });
+
+  } catch (error) {
+    logger.error('Error handling payment failed', { error: error.message, invoiceId: invoice.id });
+  }
+}
 
 // ---------------------------------------------------------------------------
 // QuickBooks OAuth routes – register only when controller is available
