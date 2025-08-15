@@ -43,37 +43,54 @@ async function checkAuthentication() {
 // Fetch dashboard stats
 async function updateStats() {
   try {
-    const [statsResponse, analyticsResponse] = await Promise.all([
-      fetch('/api/dashboard/stats', { credentials: 'include' }),
-      fetch('/api/dashboard/analytics', { credentials: 'include' })
-    ]);
+    const statsResponse = await fetch('/api/dashboard/stats', { credentials: 'include' });
 
-    // Redirect ONLY for authentication failures (401/403), ignore 404/501
-    if (
-      statsResponse.status === 401 || statsResponse.status === 403 ||
-      analyticsResponse.status === 401 || analyticsResponse.status === 403
-    ) {
-      console.log('Stats/analytics auth error, redirecting to login');
+    // Redirect ONLY for authentication failures (401/403)
+    if (statsResponse.status === 401 || statsResponse.status === 403) {
+      console.log('Stats auth error, redirecting to login');
       redirectToLogin();
       return;
     }
 
-const stats = statsResponse.ok ? await statsResponse.json().catch(() => ({})) : {};
-const analytics = analyticsResponse.ok ? await analyticsResponse.json().catch(() => ({})) : {};
+    const stats = statsResponse.ok ? await statsResponse.json().catch(() => ({})) : {};
 
+    // Update first analytics section
+    const totalFollowupsEl = document.getElementById('total-followups');
+    if (totalFollowupsEl) {
+      totalFollowupsEl.textContent = stats.totalFollowups?.count || '0';
+    }
 
-    // Update payment analytics
-    document.getElementById('avgDaysToPayment').textContent = 
-      `${(analytics.avgDaysToPayment?.toFixed(1) || '0.0')} days`;
-    document.getElementById('paymentTrend').textContent = 
-      `${analytics.paymentTrendPercentage}%`;
+    const pendingFollowupsEl = document.getElementById('pending-followups');
+    if (pendingFollowupsEl) {
+      pendingFollowupsEl.textContent = stats.pendingFollowups?.count || '0';
+    }
 
-    document.getElementById('totalOutstanding').textContent = 
-      `$${stats.totalOutstanding?.total?.toFixed(2) || '0.00'}`;
-    document.getElementById('followupsToday').textContent = 
-      stats.followupsToday?.count || '0';
-    document.getElementById('openRate').textContent = 
-      `${stats.openRate?.rate || '0'}%`;
+    const deliveredFollowupsEl = document.getElementById('delivered-followups');
+    if (deliveredFollowupsEl) {
+      deliveredFollowupsEl.textContent = stats.deliveredFollowups?.count || '0';
+    }
+
+    const outstandingAmountEl = document.getElementById('outstanding-amount');
+    if (outstandingAmountEl) {
+      outstandingAmountEl.textContent = `$${(stats.outstandingAmount?.total || 0).toLocaleString()}`;
+    }
+
+    // Update second analytics section
+    const totalOutstandingEl = document.getElementById('totalOutstanding');
+    if (totalOutstandingEl) {
+      totalOutstandingEl.textContent = `$${stats.totalOutstanding?.total?.toFixed(2) || '0.00'}`;
+    }
+
+    const followupsTodayEl = document.getElementById('followupsToday');
+    if (followupsTodayEl) {
+      followupsTodayEl.textContent = stats.followupsToday?.count || '0';
+    }
+
+    const openRateEl = document.getElementById('openRate');
+    if (openRateEl) {
+      openRateEl.textContent = `${stats.openRate?.rate || '0'}%`;
+    }
+
   } catch (error) {
     console.error('Error updating stats:', error);
     // Log the error but do not force logout for missing/invalid data
@@ -205,35 +222,6 @@ if (companyNameEl) {
     redirectToLogin();
   });
 
-// Load dashboard statistics
-async function loadDashboardStats() {
-  try {
-    const response = await fetch('/api/dashboard/stats', {
-      method: 'GET',
-      credentials: 'include'
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const stats = await response.json();
-
-    // Update stats display
-    document.getElementById('total-outstanding').textContent = 
-      `$${(stats.totalOutstanding?.total || 0).toLocaleString()}`;
-    document.getElementById('followups-today').textContent = 
-      stats.followupsToday?.count || 0;
-    document.getElementById('open-rate').textContent = 
-      `${stats.openRate?.rate || 0}%`;
-
-  } catch (error) {
-    console.error('Error loading dashboard stats:', error);
-    document.getElementById('total-outstanding').textContent = 'Error';
-    document.getElementById('followups-today').textContent = 'Error';
-    document.getElementById('open-rate').textContent = 'Error';
-  }
-}
 
 // Load invoices list
 // [REMOVED DUPLICATE FUNCTION loadInvoices THAT WROTE TO invoices-table-body]

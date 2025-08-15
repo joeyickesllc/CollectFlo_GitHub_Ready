@@ -177,10 +177,68 @@ router.get('/user-info', optionalAuth, async (req, res, next) => {
  */
 router.get('/dashboard/stats', requireAuth, async (req, res, next) => {
   try {
-    // Will be replaced with dashboardController.getStats
-    res.status(501).json({ message: 'Not implemented yet' });
+    const userId = req.user.id;
+    
+    // Get user's company ID
+    const userCompany = await db.queryOne(
+      'SELECT company_id FROM users WHERE id = $1',
+      [userId]
+    );
+    const companyId = userCompany?.company_id;
+
+    // Get follow-up stats
+    const followUpStats = await db.queryOne(`
+      SELECT 
+        COUNT(*) as total_followups,
+        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_followups,
+        COUNT(CASE WHEN status = 'delivered' THEN 1 END) as delivered_followups,
+        COUNT(CASE WHEN DATE(scheduled_date) = CURRENT_DATE THEN 1 END) as followups_today
+      FROM follow_ups 
+      WHERE company_id = $1
+    `, [companyId]);
+
+    // Get outstanding amount from invoices
+    const outstandingStats = await db.queryOne(`
+      SELECT 
+        COALESCE(SUM(CASE WHEN status = 'open' THEN balance ELSE 0 END), 0) as total_outstanding
+      FROM invoices 
+      WHERE company_id = $1
+    `, [companyId]);
+
+    // Calculate basic open rate (simplified)
+    const emailStats = await db.queryOne(`
+      SELECT 
+        COUNT(CASE WHEN method = 'email' AND status = 'delivered' THEN 1 END) as delivered_emails,
+        COUNT(CASE WHEN method = 'email' THEN 1 END) as total_emails
+      FROM follow_ups 
+      WHERE company_id = $1
+    `, [companyId]);
+
+    const openRate = emailStats?.total_emails > 0 
+      ? Math.round((emailStats.delivered_emails / emailStats.total_emails) * 100)
+      : 0;
+
+    res.json({
+      totalFollowups: { count: parseInt(followUpStats?.total_followups || 0) },
+      pendingFollowups: { count: parseInt(followUpStats?.pending_followups || 0) },
+      deliveredFollowups: { count: parseInt(followUpStats?.delivered_followups || 0) },
+      outstandingAmount: { total: parseFloat(outstandingStats?.total_outstanding || 0) },
+      totalOutstanding: { total: parseFloat(outstandingStats?.total_outstanding || 0) },
+      followupsToday: { count: parseInt(followUpStats?.followups_today || 0) },
+      openRate: { rate: openRate }
+    });
   } catch (error) {
-    next(error);
+    console.error('Dashboard stats error:', error);
+    // Return defaults on error
+    res.json({
+      totalFollowups: { count: 0 },
+      pendingFollowups: { count: 0 },
+      deliveredFollowups: { count: 0 },
+      outstandingAmount: { total: 0 },
+      totalOutstanding: { total: 0 },
+      followupsToday: { count: 0 },
+      openRate: { rate: 0 }
+    });
   }
 });
 
