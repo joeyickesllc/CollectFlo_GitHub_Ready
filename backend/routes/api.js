@@ -200,14 +200,26 @@ router.get('/dashboard/stats', requireAuth, async (req, res, next) => {
     `, [companyId]);
     console.log('Follow-up stats:', followUpStats);
 
-    // Get outstanding amount from invoices
+    // Get outstanding amount from invoices - debug version
     const outstandingStats = await db.queryOne(`
       SELECT 
-        COALESCE(SUM(CASE WHEN status = 'outstanding' THEN amount ELSE 0 END), 0) as total_outstanding
+        COALESCE(SUM(CASE WHEN status = 'outstanding' THEN amount ELSE 0 END), 0) as total_outstanding,
+        COUNT(*) as total_invoices,
+        COUNT(CASE WHEN is_excluded = true THEN 1 END) as excluded_invoices,
+        STRING_AGG(DISTINCT status, ', ') as statuses_found
       FROM invoices 
-      WHERE company_id = $1 AND is_excluded = false
+      WHERE company_id = $1
     `, [companyId]);
-    console.log('Outstanding stats:', outstandingStats);
+    console.log('Outstanding stats (debug):', outstandingStats);
+    
+    // Also get sample invoice data
+    const sampleInvoices = await db.query(`
+      SELECT id, qbo_invoice_id, status, amount, is_excluded 
+      FROM invoices 
+      WHERE company_id = $1 
+      LIMIT 5
+    `, [companyId]);
+    console.log('Sample invoices:', sampleInvoices.rows);
 
     // Calculate basic open rate (simplified) - using follow_up_type for email vs delivered status
     const emailStats = await db.queryOne(`
