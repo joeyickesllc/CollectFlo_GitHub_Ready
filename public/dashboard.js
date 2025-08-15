@@ -40,44 +40,6 @@ async function checkAuthentication() {
   }
 }
 
-// Fetch dashboard stats
-async function updateStats() {
-  try {
-    console.log('Fetching dashboard stats...');
-    const statsResponse = await fetch('/api/dashboard/stats', { credentials: 'include' });
-    console.log('Stats response status:', statsResponse.status);
-
-    // Redirect ONLY for authentication failures (401/403)
-    if (statsResponse.status === 401 || statsResponse.status === 403) {
-      console.log('Stats auth error, redirecting to login');
-      redirectToLogin();
-      return;
-    }
-
-    const stats = statsResponse.ok ? await statsResponse.json().catch(() => ({})) : {};
-    console.log('Received stats data:', stats);
-
-    // Update analytics section
-    const totalOutstandingEl = document.getElementById('totalOutstanding');
-    if (totalOutstandingEl) {
-      totalOutstandingEl.textContent = `$${stats.totalOutstanding?.total?.toFixed(2) || '0.00'}`;
-    }
-
-    const followupsTodayEl = document.getElementById('followupsToday');
-    if (followupsTodayEl) {
-      followupsTodayEl.textContent = stats.followupsToday?.count || '0';
-    }
-
-    const openRateEl = document.getElementById('openRate');
-    if (openRateEl) {
-      openRateEl.textContent = `${stats.openRate?.rate || '0'}%`;
-    }
-
-  } catch (error) {
-    console.error('Error updating stats:', error);
-    // Log the error but do not force logout for missing/invalid data
-  }
-}
 
 // Fetch and display invoices
 async function updateInvoices() {
@@ -139,8 +101,8 @@ window.toggleInvoiceExclusion = async function (invoiceId, isIncluded) {
       throw new Error('Failed to update exclusion status');
     }
 
-    // Refresh the dashboard stats since excluded invoices affect calculations
-    updateStats();
+    // Refresh the dashboard since excluded invoices changed
+    updateInvoices();
   } catch (error) {
     console.error('Error toggling exclusion:', error);
     // Revert checkbox state on error
@@ -153,12 +115,10 @@ async function initializeDashboard() {
   const isAuthenticated = await checkAuthentication();
 
   if (isAuthenticated) {
-    updateStats();
     updateInvoices();
 
     // Update dashboard every minute
     setInterval(() => {
-      updateStats();
       updateInvoices();
     }, 60000);
   }
@@ -238,7 +198,6 @@ window.toggleExclusion = async function (invoiceId, excluded) {
 };
 // Load dashboard data (unused legacy function removed)
 
-// Load dashboard statistics (legacy, removed in favor of updateStats())
 
 // Load invoices and follow-ups
 async function loadInvoices() {
