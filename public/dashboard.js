@@ -54,28 +54,7 @@ async function updateStats() {
 
     const stats = statsResponse.ok ? await statsResponse.json().catch(() => ({})) : {};
 
-    // Update first analytics section
-    const totalFollowupsEl = document.getElementById('total-followups');
-    if (totalFollowupsEl) {
-      totalFollowupsEl.textContent = stats.totalFollowups?.count || '0';
-    }
-
-    const pendingFollowupsEl = document.getElementById('pending-followups');
-    if (pendingFollowupsEl) {
-      pendingFollowupsEl.textContent = stats.pendingFollowups?.count || '0';
-    }
-
-    const deliveredFollowupsEl = document.getElementById('delivered-followups');
-    if (deliveredFollowupsEl) {
-      deliveredFollowupsEl.textContent = stats.deliveredFollowups?.count || '0';
-    }
-
-    const outstandingAmountEl = document.getElementById('outstanding-amount');
-    if (outstandingAmountEl) {
-      outstandingAmountEl.textContent = `$${(stats.outstandingAmount?.total || 0).toLocaleString()}`;
-    }
-
-    // Update second analytics section
+    // Update analytics section
     const totalOutstandingEl = document.getElementById('totalOutstanding');
     if (totalOutstandingEl) {
       totalOutstandingEl.textContent = `$${stats.totalOutstanding?.total?.toFixed(2) || '0.00'}`;

@@ -219,10 +219,6 @@ router.get('/dashboard/stats', requireAuth, async (req, res, next) => {
       : 0;
 
     res.json({
-      totalFollowups: { count: parseInt(followUpStats?.total_followups || 0) },
-      pendingFollowups: { count: parseInt(followUpStats?.pending_followups || 0) },
-      deliveredFollowups: { count: parseInt(followUpStats?.delivered_followups || 0) },
-      outstandingAmount: { total: parseFloat(outstandingStats?.total_outstanding || 0) },
       totalOutstanding: { total: parseFloat(outstandingStats?.total_outstanding || 0) },
       followupsToday: { count: parseInt(followUpStats?.followups_today || 0) },
       openRate: { rate: openRate }
@@ -231,10 +227,6 @@ router.get('/dashboard/stats', requireAuth, async (req, res, next) => {
     console.error('Dashboard stats error:', error);
     // Return defaults on error
     res.json({
-      totalFollowups: { count: 0 },
-      pendingFollowups: { count: 0 },
-      deliveredFollowups: { count: 0 },
-      outstandingAmount: { total: 0 },
       totalOutstanding: { total: 0 },
       followupsToday: { count: 0 },
       openRate: { rate: 0 }
