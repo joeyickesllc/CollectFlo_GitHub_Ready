@@ -898,14 +898,45 @@ router.post('/test-email', requireAuth, async (req, res, next) => {
       result
     });
   } catch (error) {
+    // Log detailed error information for debugging
+    logger.error('Test email API endpoint failed', {
+      error: error.message,
+      stack: error.stack,
+      errorCode: error.code,
+      errorType: error.name,
+      sendGridResponse: error.response?.body,
+      sendGridStatus: error.response?.status,
+      requestBody: req.body,
+      userId: req.user?.id,
+      userEmail: req.user?.email
+    });
+
     // Return a more helpful error payload to assist troubleshooting in the UI
     const details = error?.response?.body || error?.body || undefined;
-    return res.status(500).json({
+    const errorInfo = {
       success: false,
       message: 'Failed to send test email',
       error: error.message,
-      ...(details && { details })
-    });
+      errorCode: error.code,
+      errorType: error.name || 'Error'
+    };
+
+    // Add SendGrid specific error details if available
+    if (error.response?.body) {
+      errorInfo.sendGridError = error.response.body;
+      errorInfo.sendGridStatus = error.response.status;
+    }
+
+    // Add additional context for common issues
+    if (error.message?.includes('API key')) {
+      errorInfo.troubleshoot = 'Check SendGrid API key configuration';
+    } else if (error.message?.includes('from email')) {
+      errorInfo.troubleshoot = 'Check SendGrid sender email verification';
+    } else if (error.message?.includes('Unauthorized')) {
+      errorInfo.troubleshoot = 'SendGrid API key may be invalid or expired';
+    }
+
+    return res.status(500).json(errorInfo);
   }
 });
 

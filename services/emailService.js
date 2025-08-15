@@ -407,7 +407,12 @@ async function sendFollowUpEmail(params) {
           customerName,
           templateType,
           error: sendError.message,
-          to: emailData.to
+          to: emailData.to,
+          errorCode: sendError.code,
+          errorType: sendError.name,
+          sendGridResponse: sendError.response?.body,
+          sendGridStatus: sendError.response?.status,
+          stack: sendError.stack
         });
         throw sendError;
       }
@@ -450,19 +455,53 @@ async function sendFollowUpEmail(params) {
  * @returns {Object} Send result
  */
 async function sendTestFollowUpEmail(toEmail, testData = {}) {
-  const testParams = {
-    invoiceId: testData.invoiceId || 'TEST-001',
-    customerName: testData.customerName || 'Test Customer',
-    amount: testData.amount || 1500.00,
-    dueDate: testData.dueDate || '2025-07-15',
-    daysOverdue: testData.daysOverdue || 5,
-    templateType: testData.templateType || 'gentle_reminder',
-    companyId: testData.companyId || 1,
-    customerEmail: toEmail,
-    paymentLink: testData.paymentLink || 'https://example.com/pay/test-123'
-  };
+  logger.info('Starting test email send', {
+    toEmail,
+    testData,
+    sendgridConfigured: !!secrets.sendgrid?.apiKey,
+    fromEmail: secrets.sendgrid?.fromEmail
+  });
 
-  return await sendFollowUpEmail(testParams);
+  try {
+    // Validate SendGrid configuration
+    if (!secrets.sendgrid?.apiKey) {
+      throw new Error('SendGrid API key not configured in secrets');
+    }
+    
+    if (!secrets.sendgrid?.fromEmail) {
+      throw new Error('SendGrid from email not configured in secrets');
+    }
+
+    const testParams = {
+      invoiceId: testData.invoiceId || 'TEST-001',
+      customerName: testData.customerName || 'Test Customer',
+      amount: testData.amount || 1500.00,
+      dueDate: testData.dueDate || '2025-07-15',
+      daysOverdue: testData.daysOverdue || 5,
+      templateType: testData.templateType || 'gentle_reminder',
+      companyId: testData.companyId || 1,
+      customerEmail: toEmail,
+      paymentLink: testData.paymentLink || 'https://example.com/pay/test-123'
+    };
+
+    logger.info('Test email parameters prepared', { testParams });
+
+    const result = await sendFollowUpEmail(testParams);
+    
+    logger.info('Test email completed', { result });
+    return result;
+
+  } catch (error) {
+    logger.error('Test email failed', {
+      error: error.message,
+      stack: error.stack,
+      toEmail,
+      sendgridConfigured: !!secrets.sendgrid?.apiKey,
+      errorCode: error.code,
+      errorResponse: error.response?.body
+    });
+    throw error;
+  }
 }
 
 module.exports = {

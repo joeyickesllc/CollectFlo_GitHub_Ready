@@ -528,16 +528,36 @@ document.getElementById('previewFollowUp').addEventListener('click', async () =>
         alert('Test email sent successfully!');
       } else {
         let serverMsg = 'Failed to send test email';
+        let detailedError = '';
         try {
           const errData = await response.json();
+          console.error('Detailed email error:', errData);
+          
           if (errData?.message) serverMsg = errData.message;
           if (errData?.error) serverMsg += `: ${errData.error}`;
+          
+          // Build detailed error message for troubleshooting
+          const errorDetails = [];
+          if (errData?.errorCode) errorDetails.push(`Code: ${errData.errorCode}`);
+          if (errData?.errorType) errorDetails.push(`Type: ${errData.errorType}`);
+          if (errData?.troubleshoot) errorDetails.push(`Tip: ${errData.troubleshoot}`);
+          if (errData?.sendGridError) {
+            errorDetails.push(`SendGrid: ${JSON.stringify(errData.sendGridError)}`);
+          }
+          
+          if (errorDetails.length > 0) {
+            detailedError = '\n\nTechnical Details:\n' + errorDetails.join('\n');
+          }
         } catch (_) {}
+        
+        alert(serverMsg + detailedError);
         throw new Error(serverMsg);
       }
     } catch (error) {
       console.error('Error sending test email:', error);
-      alert('Failed to send test email. Please try again.');
+      if (!error.message.includes('Failed to send test email')) {
+        alert('Failed to send test email. Check console for details.');
+      }
     }
   }
 });
