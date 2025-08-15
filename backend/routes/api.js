@@ -41,6 +41,7 @@ const {
   authRateLimiter,
   signupRateLimiter,
 } = require('../middleware/securityMiddleware');
+const { checkTrialStatus, requireActiveSubscription } = require('../middleware/trialMiddleware');
 const logger = require('../services/logger');
 const db = require('../db/connection'); // <-- DB connection for setup route
 
@@ -156,12 +157,41 @@ router.get('/__debug/login', (req, res) => {
 router.get('/user-info', optionalAuth, async (req, res, next) => {
   try {
     if (req.user) {
-      // Only expose non-sensitive fields
-      const { id, email, role } = req.user;
-      return res.status(200).json({
+      // Get user info with trial status
+      const user = await db.queryOne(
+        'SELECT id, email, name, role, subscription_status, trial_end_date FROM users WHERE id = $1',
+        [req.user.id]
+      );
+      
+      if (!user) {
+        return res.status(401).json({ success: false, message: 'User not found' });
+      }
+
+      const responseData = {
         success: true,
-        user: { id, email, role }
-      });
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          subscription_status: user.subscription_status
+        }
+      };
+
+      // Add trial info if user is on trial
+      if (user.subscription_status === 'trial' && user.trial_end_date) {
+        const now = new Date();
+        const trialEndDate = new Date(user.trial_end_date);
+        const daysRemaining = Math.max(0, Math.ceil((trialEndDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)));
+        
+        responseData.user.trial_info = {
+          trial_end_date: trialEndDate.toISOString(),
+          days_remaining: daysRemaining,
+          is_expired: now > trialEndDate
+        };
+      }
+
+      return res.status(200).json(responseData);
     }
 
     // Not authenticated
@@ -175,7 +205,7 @@ router.get('/user-info', optionalAuth, async (req, res, next) => {
  * Dashboard Routes
  * All dashboard routes require authentication
  */
-router.get('/dashboard/stats', requireAuth, async (req, res, next) => {
+router.get('/dashboard/stats', requireAuth, checkTrialStatus, async (req, res, next) => {
   try {
     const userId = req.user.id;
     console.log('Dashboard stats request for user:', userId);
@@ -254,7 +284,7 @@ router.get('/dashboard/stats', requireAuth, async (req, res, next) => {
   }
 });
 
-router.get('/invoices', requireAuth, async (req, res, next) => {
+router.get('/invoices', requireAuth, checkTrialStatus, async (req, res, next) => {
   try {
     const userId = req.user.id;
     const { getValidTokens } = require('../../services/tokenStore');
@@ -368,7 +398,7 @@ router.post('/invoices/:id/exclude', requireAuth, async (req, res, next) => {
  * Settings Routes
  * All settings routes require authentication
  */
-router.get('/settings', requireAuth, async (req, res, next) => {
+router.get('/settings', requireAuth, checkTrialStatus, async (req, res, next) => {
   try {
     const userId = req.user.id;
     
@@ -398,7 +428,7 @@ router.get('/settings', requireAuth, async (req, res, next) => {
   }
 });
 
-router.post('/settings', requireAuth, async (req, res, next) => {
+router.post('/settings', requireAuth, checkTrialStatus, async (req, res, next) => {
   try {
     const userId = req.user.id;
     const { company_name, email, phone, reply_to_email } = req.body;

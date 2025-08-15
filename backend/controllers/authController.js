@@ -175,10 +175,13 @@ exports.signup = async (req, res) => {
       );
       const companyId = companyResult.rows[0].id;
 
-      // Create user
+      // Create user with 14-day trial
+      const trialStartDate = new Date();
+      const trialEndDate = new Date(trialStartDate.getTime() + (14 * 24 * 60 * 60 * 1000)); // 14 days from now
+      
       const userResult = await client.query(
-        'INSERT INTO users (name, email, password, company_id, role, created_at) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING id, email, name, role',
-        [name, email, hashedPassword, companyId, 'admin']
+        'INSERT INTO users (name, email, password, company_id, role, subscription_status, trial_start_date, trial_end_date, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW()) RETURNING id, email, name, role, subscription_status, trial_end_date',
+        [name, email, hashedPassword, companyId, 'admin', 'trial', trialStartDate, trialEndDate]
       );
       
       return {
