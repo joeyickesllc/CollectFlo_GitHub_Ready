@@ -17,7 +17,7 @@ sgMail.setApiKey(secrets.sendgrid.apiKey);
 const EMAIL_TEMPLATES = {
   pre_due_reminder: {
     subject: 'Invoice {{invoiceNumber}} - Due Tomorrow',
-    html: `
+    html: String.raw`
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <p>Hi {{customerName}},</p>
         
@@ -48,7 +48,7 @@ const EMAIL_TEMPLATES = {
   
   due_date_notice: {
     subject: 'Invoice {{invoiceNumber}} - Due Today',
-    html: `
+    html: String.raw`
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <p>Hi {{customerName}},</p>
         
@@ -101,7 +101,7 @@ const EMAIL_TEMPLATES = {
   
   second_reminder: {
     subject: 'Re: Invoice {{invoiceNumber}} - Past Due',
-    html: `
+    html: String.raw`
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <p>Hi {{customerName}},</p>
         
@@ -133,7 +133,7 @@ const EMAIL_TEMPLATES = {
   
   firm_reminder: {
     subject: 'URGENT: Invoice {{invoiceNumber}} - Immediate Action Required',
-    html: `
+    html: String.raw`
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <p>{{customerName}},</p>
         
@@ -169,7 +169,7 @@ const EMAIL_TEMPLATES = {
   
   fourth_reminder: {
     subject: 'CRITICAL: Invoice {{invoiceNumber}} - Account in Jeopardy',
-    html: `
+    html: String.raw`
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <p>{{customerName}},</p>
         
@@ -209,7 +209,7 @@ const EMAIL_TEMPLATES = {
   
   final_notice: {
     subject: 'FINAL NOTICE: Invoice {{invoiceNumber}} - Action Required',
-    html: `
+    html: String.raw`
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <p>{{customerName}},</p>
         
