@@ -79,33 +79,24 @@ const EMAIL_TEMPLATES = {
   
   gentle_reminder: {
     subject: 'Invoice {{invoiceNumber}} - Payment Due',
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <p>Hi {{customerName}},</p>
-        
-        <p>I hope you're doing well. I wanted to reach out regarding invoice {{invoiceNumber}} which was due on {{dueDate}}.</p>
-        
-        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
-          <p><strong>Invoice #{{invoiceNumber}}</strong></p>
-          <p><strong>Amount Due:</strong> ${{amount}}</p>
-          <p><strong>Due Date:</strong> {{dueDate}}</p>
-        </div>
-        
-        <p>I know things can get busy, so I just wanted to make sure this didn't slip through the cracks. If you've already sent the payment, please disregard this message.</p>
-        
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="{{paymentLink}}" style="background-color: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
-            💳 Pay Invoice Online
-          </a>
-        </div>
-        
-        <p>You can pay securely online using the button above, or if you have any questions or need to discuss payment arrangements, just hit reply or give me a call. I'm here to help.</p>
-        
-        <p>Thanks so much!</p>
-        
-        <p>{{companyName}}</p>
-      </div>
-    `
+    html: '<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">' +
+          '<p>Hi {{customerName}},</p>' +
+          '<p>I hope you\'re doing well. I wanted to reach out regarding invoice {{invoiceNumber}} which was due on {{dueDate}}.</p>' +
+          '<div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">' +
+          '<p><strong>Invoice #{{invoiceNumber}}</strong></p>' +
+          '<p><strong>Amount Due:</strong> ${{amount}}</p>' +
+          '<p><strong>Due Date:</strong> {{dueDate}}</p>' +
+          '</div>' +
+          '<p>I know things can get busy, so I just wanted to make sure this didn\'t slip through the cracks. If you\'ve already sent the payment, please disregard this message.</p>' +
+          '<div style="text-align: center; margin: 30px 0;">' +
+          '<a href="{{paymentLink}}" style="background-color: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">' +
+          '💳 Pay Invoice Online' +
+          '</a>' +
+          '</div>' +
+          '<p>You can pay securely online using the button above, or if you have any questions or need to discuss payment arrangements, just hit reply or give me a call. I\'m here to help.</p>' +
+          '<p>Thanks so much!</p>' +
+          '<p>{{companyName}}</p>' +
+          '</div>'
   },
   
   second_reminder: {
