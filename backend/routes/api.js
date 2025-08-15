@@ -178,6 +178,7 @@ router.get('/user-info', optionalAuth, async (req, res, next) => {
 router.get('/dashboard/stats', requireAuth, async (req, res, next) => {
   try {
     const userId = req.user.id;
+    console.log('Dashboard stats request for user:', userId);
     
     // Get user's company ID
     const userCompany = await db.queryOne(
@@ -185,6 +186,7 @@ router.get('/dashboard/stats', requireAuth, async (req, res, next) => {
       [userId]
     );
     const companyId = userCompany?.company_id;
+    console.log('User company:', userCompany, 'Company ID:', companyId);
 
     // Get follow-up stats
     const followUpStats = await db.queryOne(`
@@ -196,6 +198,7 @@ router.get('/dashboard/stats', requireAuth, async (req, res, next) => {
       FROM follow_ups 
       WHERE company_id = $1
     `, [companyId]);
+    console.log('Follow-up stats:', followUpStats);
 
     // Get outstanding amount from invoices
     const outstandingStats = await db.queryOne(`
@@ -204,6 +207,7 @@ router.get('/dashboard/stats', requireAuth, async (req, res, next) => {
       FROM invoices 
       WHERE company_id = $1
     `, [companyId]);
+    console.log('Outstanding stats:', outstandingStats);
 
     // Calculate basic open rate (simplified)
     const emailStats = await db.queryOne(`
@@ -213,16 +217,20 @@ router.get('/dashboard/stats', requireAuth, async (req, res, next) => {
       FROM follow_ups 
       WHERE company_id = $1
     `, [companyId]);
+    console.log('Email stats:', emailStats);
 
     const openRate = emailStats?.total_emails > 0 
       ? Math.round((emailStats.delivered_emails / emailStats.total_emails) * 100)
       : 0;
 
-    res.json({
+    const result = {
       totalOutstanding: { total: parseFloat(outstandingStats?.total_outstanding || 0) },
       followupsToday: { count: parseInt(followUpStats?.followups_today || 0) },
       openRate: { rate: openRate }
-    });
+    };
+    console.log('Sending dashboard stats result:', result);
+    
+    res.json(result);
   } catch (error) {
     console.error('Dashboard stats error:', error);
     // Return defaults on error

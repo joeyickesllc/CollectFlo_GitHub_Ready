@@ -43,7 +43,9 @@ async function checkAuthentication() {
 // Fetch dashboard stats
 async function updateStats() {
   try {
+    console.log('Fetching dashboard stats...');
     const statsResponse = await fetch('/api/dashboard/stats', { credentials: 'include' });
+    console.log('Stats response status:', statsResponse.status);
 
     // Redirect ONLY for authentication failures (401/403)
     if (statsResponse.status === 401 || statsResponse.status === 403) {
@@ -53,6 +55,7 @@ async function updateStats() {
     }
 
     const stats = statsResponse.ok ? await statsResponse.json().catch(() => ({})) : {};
+    console.log('Received stats data:', stats);
 
     // Update analytics section
     const totalOutstandingEl = document.getElementById('totalOutstanding');
