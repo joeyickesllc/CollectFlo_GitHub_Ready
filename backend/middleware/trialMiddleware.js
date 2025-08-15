@@ -72,7 +72,7 @@ exports.checkTrialStatus = async (req, res, next) => {
         message: 'Your free trial has expired. Please upgrade to continue using CollectFlo.',
         code: 'TRIAL_EXPIRED',
         trial_end_date: trialEndDate.toISOString(),
-        redirect: '/trial-expired'
+        redirect: '/subscription'
       });
     }
 

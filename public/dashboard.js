@@ -46,9 +46,25 @@ async function updateInvoices() {
   try {
     const response = await fetch('/api/invoices', { credentials: 'include' });
 
-    // Redirect only when authentication fails
-    if (response.status === 401 || response.status === 403) {
+    // Handle authentication and trial expiration
+    if (response.status === 401) {
       console.log('Invoice API auth error, redirecting to login');
+      redirectToLogin();
+      return;
+    }
+    
+    if (response.status === 403) {
+      try {
+        const errorData = await response.json();
+        if (errorData.code === 'TRIAL_EXPIRED') {
+          console.log('Trial expired, redirecting to subscription');
+          window.location.href = '/subscription';
+          return;
+        }
+      } catch (e) {
+        // If we can't parse the error, treat as general auth error
+      }
+      console.log('API access denied, redirecting to login');
       redirectToLogin();
       return;
     }

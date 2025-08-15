@@ -1145,6 +1145,304 @@ router.get('/setup-qbo-table', async (req, res) => {
   }
 });
 
+/**
+ * Stripe Subscription Routes
+ * Handle subscription checkout and webhook events
+ */
+
+// Create Stripe Checkout Session
+router.post('/create-checkout-session', requireAuth, checkTrialStatus, async (req, res, next) => {
+  try {
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    const { plan } = req.body;
+    
+    if (!plan || !['monthly', 'annual'].includes(plan)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid plan selected. Choose monthly or annual.'
+      });
+    }
+
+    // Get user info
+    const userId = req.user.id;
+    const user = await db.queryOne(
+      'SELECT id, email, name FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Determine which price ID to use
+    const priceId = plan === 'monthly' 
+      ? process.env.STRIPE_STANDARD_PRICE_ID 
+      : process.env.STRIPE_PREMIUM_PRICE_ID;
+
+    if (!priceId) {
+      logger.error('Missing Stripe price ID for plan', { plan });
+      return res.status(500).json({
+        success: false,
+        message: 'Subscription configuration error. Please contact support.'
+      });
+    }
+
+    // Create Stripe Checkout Session
+    const session = await stripe.checkout.sessions.create({
+      customer_email: user.email,
+      client_reference_id: userId.toString(),
+      line_items: [
+        {
+          price: priceId,
+          quantity: 1,
+        },
+      ],
+      mode: 'subscription',
+      success_url: `${req.protocol}://${req.get('host')}/dashboard?subscription=success`,
+      cancel_url: `${req.protocol}://${req.get('host')}/subscription?cancelled=true`,
+      metadata: {
+        user_id: userId.toString(),
+        plan: plan,
+        user_email: user.email
+      },
+      subscription_data: {
+        metadata: {
+          user_id: userId.toString(),
+          plan: plan
+        }
+      }
+    });
+
+    logger.info('Stripe checkout session created', {
+      userId,
+      sessionId: session.id,
+      plan,
+      priceId
+    });
+
+    return res.status(200).json({
+      success: true,
+      checkout_url: session.url,
+      session_id: session.id
+    });
+
+  } catch (error) {
+    logger.error('Error creating Stripe checkout session', { 
+      error: error.message,
+      userId: req.user?.id 
+    });
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to create checkout session. Please try again.'
+    });
+  }
+});
+
+// Stripe Webhook Handler
+router.post('/stripe-webhook', async (req, res, next) => {
+  try {
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    
+    const sig = req.headers['stripe-signature'];
+    let event;
+
+    try {
+      event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+    } catch (err) {
+      logger.error('Stripe webhook signature verification failed', { error: err.message });
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    // Handle the event
+    switch (event.type) {
+      case 'checkout.session.completed':
+        const session = event.data.object;
+        await handleSuccessfulPayment(session);
+        break;
+        
+      case 'customer.subscription.created':
+        const subscription = event.data.object;
+        await handleSubscriptionCreated(subscription);
+        break;
+        
+      case 'customer.subscription.updated':
+        const updatedSubscription = event.data.object;
+        await handleSubscriptionUpdated(updatedSubscription);
+        break;
+        
+      case 'customer.subscription.deleted':
+        const deletedSubscription = event.data.object;
+        await handleSubscriptionCancelled(deletedSubscription);
+        break;
+        
+      case 'invoice.payment_failed':
+        const failedInvoice = event.data.object;
+        await handlePaymentFailed(failedInvoice);
+        break;
+
+      default:
+        logger.debug('Unhandled Stripe webhook event type', { type: event.type });
+    }
+
+    return res.status(200).json({ received: true });
+
+  } catch (error) {
+    logger.error('Error processing Stripe webhook', { error: error.message });
+    return res.status(500).json({ success: false, message: 'Webhook processing failed' });
+  }
+});
+
+// Webhook helper functions
+async function handleSuccessfulPayment(session) {
+  try {
+    const userId = session.client_reference_id;
+    const customerEmail = session.customer_email;
+    
+    if (!userId) {
+      logger.error('No user ID in successful payment session', { sessionId: session.id });
+      return;
+    }
+
+    // Update user subscription status
+    await db.execute(
+      'UPDATE users SET subscription_status = $1, subscription_start_date = $2 WHERE id = $3',
+      ['active', new Date(), userId]
+    );
+
+    logger.info('User subscription activated', {
+      userId,
+      sessionId: session.id,
+      customerEmail
+    });
+
+  } catch (error) {
+    logger.error('Error handling successful payment', { error: error.message, sessionId: session.id });
+  }
+}
+
+async function handleSubscriptionCreated(subscription) {
+  try {
+    const userId = subscription.metadata.user_id;
+    
+    if (!userId) {
+      logger.error('No user ID in subscription metadata', { subscriptionId: subscription.id });
+      return;
+    }
+
+    // Update user with Stripe subscription ID
+    await db.execute(
+      'UPDATE users SET subscription_status = $1, stripe_subscription_id = $2 WHERE id = $3',
+      ['active', subscription.id, userId]
+    );
+
+    logger.info('Subscription created and linked to user', {
+      userId,
+      subscriptionId: subscription.id
+    });
+
+  } catch (error) {
+    logger.error('Error handling subscription created', { error: error.message, subscriptionId: subscription.id });
+  }
+}
+
+async function handleSubscriptionUpdated(subscription) {
+  try {
+    const userId = subscription.metadata.user_id;
+    
+    if (!userId) {
+      logger.error('No user ID in subscription metadata', { subscriptionId: subscription.id });
+      return;
+    }
+
+    // Update subscription status based on Stripe status
+    let status = 'active';
+    if (subscription.status === 'canceled') {
+      status = 'cancelled';
+    } else if (subscription.status === 'past_due') {
+      status = 'past_due';
+    }
+
+    await db.execute(
+      'UPDATE users SET subscription_status = $1 WHERE id = $2',
+      [status, userId]
+    );
+
+    logger.info('Subscription status updated', {
+      userId,
+      subscriptionId: subscription.id,
+      newStatus: status
+    });
+
+  } catch (error) {
+    logger.error('Error handling subscription updated', { error: error.message, subscriptionId: subscription.id });
+  }
+}
+
+async function handleSubscriptionCancelled(subscription) {
+  try {
+    const userId = subscription.metadata.user_id;
+    
+    if (!userId) {
+      logger.error('No user ID in subscription metadata', { subscriptionId: subscription.id });
+      return;
+    }
+
+    await db.execute(
+      'UPDATE users SET subscription_status = $1 WHERE id = $2',
+      ['cancelled', userId]
+    );
+
+    logger.info('Subscription cancelled', {
+      userId,
+      subscriptionId: subscription.id
+    });
+
+  } catch (error) {
+    logger.error('Error handling subscription cancelled', { error: error.message, subscriptionId: subscription.id });
+  }
+}
+
+async function handlePaymentFailed(invoice) {
+  try {
+    const subscriptionId = invoice.subscription;
+    
+    if (!subscriptionId) {
+      logger.error('No subscription ID in failed payment invoice', { invoiceId: invoice.id });
+      return;
+    }
+
+    // Find user by subscription ID
+    const user = await db.queryOne(
+      'SELECT id FROM users WHERE stripe_subscription_id = $1',
+      [subscriptionId]
+    );
+
+    if (!user) {
+      logger.error('No user found for failed payment', { subscriptionId });
+      return;
+    }
+
+    // Update status to past due
+    await db.execute(
+      'UPDATE users SET subscription_status = $1 WHERE id = $2',
+      ['past_due', user.id]
+    );
+
+    logger.info('Payment failed, user marked as past due', {
+      userId: user.id,
+      subscriptionId,
+      invoiceId: invoice.id
+    });
+
+  } catch (error) {
+    logger.error('Error handling payment failed', { error: error.message, invoiceId: invoice.id });
+  }
+}
+
 // Centralized error handling for API routes
 router.use(errorMiddleware);
 

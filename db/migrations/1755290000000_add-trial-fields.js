@@ -28,6 +28,10 @@ exports.up = async (pgm) => {
     last_trial_check: {
       type: 'TIMESTAMPTZ',
       notNull: false, // For optimization - track when we last checked trial status
+    },
+    stripe_subscription_id: {
+      type: 'VARCHAR(255)',
+      notNull: false, // Stripe subscription ID for active subscribers
     }
   });
 
@@ -58,6 +62,7 @@ exports.down = async (pgm) => {
     'trial_start_date', 
     'trial_end_date',
     'subscription_start_date',
-    'last_trial_check'
+    'last_trial_check',
+    'stripe_subscription_id'
   ]);
 };

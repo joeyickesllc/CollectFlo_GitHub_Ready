@@ -1,3 +1,26 @@
+// Helper function to handle API response errors including trial expiration
+function handleApiError(response) {
+  if (response.status === 401) {
+    window.location.href = '/login';
+    return true;
+  }
+  
+  if (response.status === 403) {
+    response.json().then(data => {
+      if (data.code === 'TRIAL_EXPIRED') {
+        window.location.href = '/subscription';
+      } else {
+        window.location.href = '/login';
+      }
+    }).catch(() => {
+      window.location.href = '/login';
+    });
+    return true;
+  }
+  
+  return false;
+}
+
 // Logo preview handling
 const logoInput = document.getElementById('logoInput');
 const logoPreview = document.getElementById('logoPreview');
@@ -23,8 +46,7 @@ async function loadCompanySettings() {
     });
     
     if (!response.ok) {
-      if (response.status === 401) {
-        window.location.href = '/login';
+      if (handleApiError(response)) {
         return;
       }
       console.error('Failed to load settings:', response.status);

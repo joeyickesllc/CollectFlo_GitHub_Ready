@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Choose Your Plan - CollectFlo</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script src="/nav.js"></script>
+</head>
+<body class="bg-gray-50">
+  <div id="nav-placeholder"></div>
+
+  <div class="container mx-auto px-4 py-16">
+    <div class="max-w-4xl mx-auto">
+      <div class="text-center mb-12">
+        <h1 class="text-4xl font-bold mb-4">Continue with CollectFlo</h1>
+        <p class="text-xl text-gray-600 mb-2">Choose the plan that works best for your business</p>
+        <p class="text-gray-500">Cancel anytime. No setup fees.</p>
+      </div>
+
+      <!-- Error message container -->
+      <div id="error-container" class="mb-6 hidden">
+        <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded max-w-2xl mx-auto">
+          <div class="flex">
+            <svg class="w-5 h-5 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+            </svg>
+            <div>
+              <p class="font-medium">Error</p>
+              <p class="text-sm" id="error-message"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading overlay -->
+      <div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white p-6 rounded-lg shadow-lg">
+          <div class="flex items-center">
+            <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600 mr-3"></div>
+            <p>Redirecting to secure checkout...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pricing Cards -->
+      <div class="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+        
+        <!-- Monthly Plan -->
+        <div class="bg-white rounded-lg shadow-lg border border-gray-200 p-8 relative">
+          <div class="text-center mb-6">
+            <h3 class="text-2xl font-bold mb-2">Monthly</h3>
+            <div class="text-4xl font-bold text-indigo-600 mb-2">$299<span class="text-lg text-gray-500">/month</span></div>
+            <p class="text-gray-600">Perfect for getting started</p>
+          </div>
+          
+          <ul class="space-y-3 mb-8">
+            <li class="flex items-center">
+              <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+              Unlimited automated follow-ups
+            </li>
+            <li class="flex items-center">
+              <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+              Complete QuickBooks integration
+            </li>
+            <li class="flex items-center">
+              <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+              Email automation & templates
+            </li>
+            <li class="flex items-center">
+              <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+              Payment collection automation
+            </li>
+            <li class="flex items-center">
+              <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+              Dashboard & reporting
+            </li>
+            <li class="flex items-center">
+              <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+              Email support
+            </li>
+          </ul>
+
+          <button 
+            onclick="subscribeToStripe('monthly')" 
+            class="w-full bg-indigo-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+            id="monthly-btn"
+          >
+            Choose Monthly Plan
+          </button>
+        </div>
+
+        <!-- Annual Plan -->
+        <div class="bg-white rounded-lg shadow-lg border-2 border-indigo-500 p-8 relative">
+          <!-- Popular badge -->
+          <div class="absolute -top-3 left-1/2 transform -translate-x-1/2">
+            <span class="bg-indigo-500 text-white px-4 py-1 rounded-full text-sm font-medium">Most Popular</span>
+          </div>
+
+          <div class="text-center mb-6">
+            <h3 class="text-2xl font-bold mb-2">Annual</h3>
+            <div class="text-4xl font-bold text-indigo-600 mb-2">$1,800<span class="text-lg text-gray-500">/year</span></div>
+            <p class="text-green-600 font-medium">Save $1,788 per year</p>
+            <p class="text-gray-600 text-sm">$150/month when paid annually</p>
+          </div>
+          
+          <ul class="space-y-3 mb-8">
+            <li class="flex items-center">
+              <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+              Everything in Monthly plan
+            </li>
+            <li class="flex items-center">
+              <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+              <strong>Save $1,788 annually</strong>
+            </li>
+            <li class="flex items-center">
+              <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+              Priority email support
+            </li>
+            <li class="flex items-center">
+              <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+              Advanced reporting features
+            </li>
+            <li class="flex items-center">
+              <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+              Early access to new features
+            </li>
+          </ul>
+
+          <button 
+            onclick="subscribeToStripe('annual')" 
+            class="w-full bg-indigo-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+            id="annual-btn"
+          >
+            Choose Annual Plan
+          </button>
+        </div>
+      </div>
+
+      <!-- Trust indicators -->
+      <div class="text-center mt-12">
+        <div class="flex justify-center items-center space-x-8 text-gray-400">
+          <div class="flex items-center">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+            </svg>
+            <span class="text-sm">Secure SSL Encryption</span>
+          </div>
+          <div class="flex items-center">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span class="text-sm">Cancel Anytime</span>
+          </div>
+          <div class="flex items-center">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
+            </svg>
+            <span class="text-sm">Stripe Secured</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- FAQ Section -->
+      <div class="mt-16 max-w-2xl mx-auto">
+        <h3 class="text-2xl font-bold text-center mb-8">Frequently Asked Questions</h3>
+        <div class="space-y-6">
+          <div>
+            <h4 class="font-semibold mb-2">Can I change plans later?</h4>
+            <p class="text-gray-600">Yes, you can upgrade or downgrade your plan at any time. Changes will be prorated automatically.</p>
+          </div>
+          <div>
+            <h4 class="font-semibold mb-2">What payment methods do you accept?</h4>
+            <p class="text-gray-600">We accept all major credit cards, ACH transfers, and other payment methods through our secure Stripe integration.</p>
+          </div>
+          <div>
+            <h4 class="font-semibold mb-2">Is there a setup fee?</h4>
+            <p class="text-gray-600">No setup fees or hidden charges. The price you see is exactly what you'll pay.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showError(message) {
+      const container = document.getElementById('error-container');
+      const messageElement = document.getElementById('error-message');
+      
+      messageElement.textContent = message;
+      container.classList.remove('hidden');
+      
+      // Scroll to error
+      container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    
+    function hideError() {
+      document.getElementById('error-container').classList.add('hidden');
+    }
+
+    function showLoading() {
+      document.getElementById('loading-overlay').classList.remove('hidden');
+    }
+
+    function hideLoading() {
+      document.getElementById('loading-overlay').classList.add('hidden');
+    }
+
+    async function subscribeToStripe(planType) {
+      try {
+        hideError();
+        showLoading();
+
+        // Disable buttons to prevent double clicks
+        document.getElementById('monthly-btn').disabled = true;
+        document.getElementById('annual-btn').disabled = true;
+
+        const response = await fetch('/api/create-checkout-session', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            plan: planType
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Failed to create checkout session');
+        }
+
+        // Redirect to Stripe Checkout
+        window.location.href = data.checkout_url;
+
+      } catch (error) {
+        console.error('Subscription error:', error);
+        hideLoading();
+        showError(error.message || 'Unable to start checkout process. Please try again.');
+        
+        // Re-enable buttons
+        document.getElementById('monthly-btn').disabled = false;
+        document.getElementById('annual-btn').disabled = false;
+      }
+    }
+
+    // Check authentication on page load
+    fetch('/api/user-info', { credentials: 'include' })
+      .then(response => {
+        if (!response.ok) {
+          // Not authenticated, redirect to login
+          window.location.href = '/login?redirect=subscription';
+        }
+        return response.json();
+      })
+      .then(userInfo => {
+        if (userInfo && userInfo.user) {
+          console.log('User authenticated for subscription:', userInfo.user.email);
+          
+          // Check if user already has active subscription
+          if (userInfo.user.subscription_status === 'active') {
+            // Redirect to dashboard if already subscribed
+            window.location.href = '/dashboard';
+          }
+        }
+      })
+      .catch(error => {
+        console.error('Auth check error:', error);
+        window.location.href = '/login?redirect=subscription';
+      });
+  </script>
+</body>
+</html>

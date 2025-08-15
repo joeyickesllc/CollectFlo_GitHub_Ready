@@ -120,6 +120,9 @@ if (IS_PRODUCTION) {
   app.use(morgan('dev'));
 }
 
+// Special raw body handling for Stripe webhooks (must be before express.json())
+app.use('/api/stripe-webhook', express.raw({ type: 'application/json' }));
+
 // Body parsing middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
