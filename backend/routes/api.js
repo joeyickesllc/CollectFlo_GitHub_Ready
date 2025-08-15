@@ -194,7 +194,7 @@ router.get('/dashboard/stats', requireAuth, async (req, res, next) => {
         COUNT(*) as total_followups,
         COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_followups,
         COUNT(CASE WHEN status = 'delivered' THEN 1 END) as delivered_followups,
-        COUNT(CASE WHEN DATE(scheduled_date) = CURRENT_DATE THEN 1 END) as followups_today
+        COUNT(CASE WHEN DATE(scheduled_at) = CURRENT_DATE THEN 1 END) as followups_today
       FROM follow_ups 
       WHERE company_id = $1
     `, [companyId]);
@@ -203,17 +203,17 @@ router.get('/dashboard/stats', requireAuth, async (req, res, next) => {
     // Get outstanding amount from invoices
     const outstandingStats = await db.queryOne(`
       SELECT 
-        COALESCE(SUM(CASE WHEN status = 'open' THEN balance ELSE 0 END), 0) as total_outstanding
+        COALESCE(SUM(CASE WHEN status = 'outstanding' THEN amount ELSE 0 END), 0) as total_outstanding
       FROM invoices 
-      WHERE company_id = $1
+      WHERE company_id = $1 AND is_excluded = false
     `, [companyId]);
     console.log('Outstanding stats:', outstandingStats);
 
-    // Calculate basic open rate (simplified)
+    // Calculate basic open rate (simplified) - using follow_up_type for email vs delivered status
     const emailStats = await db.queryOne(`
       SELECT 
-        COUNT(CASE WHEN method = 'email' AND status = 'delivered' THEN 1 END) as delivered_emails,
-        COUNT(CASE WHEN method = 'email' THEN 1 END) as total_emails
+        COUNT(CASE WHEN follow_up_type = 'email' AND status = 'delivered' THEN 1 END) as delivered_emails,
+        COUNT(CASE WHEN follow_up_type = 'email' THEN 1 END) as total_emails
       FROM follow_ups 
       WHERE company_id = $1
     `, [companyId]);
