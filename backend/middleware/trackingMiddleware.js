@@ -256,8 +256,8 @@ async function ensureSequenceSync() {
     const maxIdResult = await db.queryOne('SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM user_activity');
     const nextId = maxIdResult?.next_id || 1;
     
-    // Get the current sequence value
-    const seqResult = await db.queryOne("SELECT nextval('user_activity_id_seq') AS current_seq");
+    // Get the current sequence value without incrementing it
+    const seqResult = await db.queryOne("SELECT last_value AS current_seq FROM user_activity_id_seq");
     const currentSeq = seqResult?.current_seq || 1;
     
     // If sequence is behind the actual max ID, fix it
