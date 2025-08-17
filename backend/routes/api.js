@@ -1146,6 +1146,113 @@ router.get('/setup-qbo-table', async (req, res) => {
 });
 
 /**
+ * Admin User Creation Route (protected by environment variable)
+ * Only works when ADMIN_SETUP_SECRET is set in environment
+ */
+router.post('/create-admin', async (req, res, next) => {
+  try {
+    const { email, password, name, company_name, admin_secret } = req.body;
+    
+    // Check if admin setup is enabled and secret matches
+    const expectedSecret = process.env.ADMIN_SETUP_SECRET;
+    if (!expectedSecret || admin_secret !== expectedSecret) {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin setup not available or invalid secret'
+      });
+    }
+
+    // Validate inputs
+    if (!email || !password || !name) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email, password, and name are required'
+      });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 8 characters long'
+      });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid email format'
+      });
+    }
+
+    // Check if user already exists
+    const existingUser = await db.queryOne('SELECT email FROM users WHERE email = $1', [email]);
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message: 'User already exists'
+      });
+    }
+
+    // Hash password
+    const bcrypt = require('bcryptjs');
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create admin user
+    const result = await db.transaction(async (client) => {
+      // Create company
+      const companyResult = await client.query(
+        'INSERT INTO companies (name, created_at, is_beta) VALUES ($1, NOW(), true) RETURNING id',
+        [company_name || 'CollectFlo Admin']
+      );
+      const companyId = companyResult.rows[0].id;
+
+      // Create admin user with active subscription
+      const trialStartDate = new Date();
+      const trialEndDate = new Date(trialStartDate.getTime() + (365 * 24 * 60 * 60 * 1000)); // 1 year
+      
+      const userResult = await client.query(
+        `INSERT INTO users 
+         (name, email, password, company_id, role, is_beta, subscription_status, trial_start_date, trial_end_date, subscription_start_date, created_at) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW()) 
+         RETURNING id, email, name, role, subscription_status`,
+        [name, email, hashedPassword, companyId, 'admin', true, 'active', trialStartDate, trialEndDate, new Date()]
+      );
+
+      return {
+        user: userResult.rows[0],
+        companyId
+      };
+    });
+
+    logger.info('Admin user created', {
+      userId: result.user.id,
+      email: result.user.email,
+      companyId: result.companyId
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Admin user created successfully',
+      user: {
+        id: result.user.id,
+        email: result.user.email,
+        name: result.user.name,
+        role: result.user.role,
+        subscription_status: result.user.subscription_status
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error creating admin user', { error: error.message });
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to create admin user'
+    });
+  }
+});
+
+/**
  * Stripe Subscription Routes
  * Handle subscription checkout and webhook events
  */
