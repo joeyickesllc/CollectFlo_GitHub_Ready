@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script src="/nav.js"></script>
+</head>
+<body class="bg-gray-100">
+  <div id="nav-placeholder"></div>
+  <div class="container mx-auto px-4 py-8">
+    <h1 class="text-3xl font-bold mb-8">Admin Dashboard</h1>
+
+    <div id="admin-alert" class="hidden bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded mb-6"></div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div class="bg-white shadow rounded p-6">
+        <div class="text-sm text-gray-500">Users</div>
+        <div id="usersCount" class="text-3xl font-semibold mt-2">-</div>
+      </div>
+      <div class="bg-white shadow rounded p-6">
+        <div class="text-sm text-gray-500">Companies</div>
+        <div id="companiesCount" class="text-3xl font-semibold mt-2">-</div>
+      </div>
+      <div class="bg-white shadow rounded p-6">
+        <div class="text-sm text-gray-500">Invoices</div>
+        <div class="mt-2">
+          <div class="text-xl font-semibold">Total: <span id="totalInvoices">-</span></div>
+          <div class="text-gray-600 mt-1">Outstanding: <span id="outstandingInvoices">-</span></div>
+          <div class="text-gray-600 mt-1">Outstanding Amount: $<span id="totalOutstanding">-</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="bg-white shadow rounded p-6">
+        <h2 class="text-xl font-semibold mb-4">Follow-ups</h2>
+        <div class="space-y-2">
+          <div>Total: <span id="followupsTotal">-</span></div>
+          <div>Pending: <span id="followupsPending">-</span></div>
+          <div>Delivered: <span id="followupsDelivered">-</span></div>
+        </div>
+      </div>
+
+      <div class="bg-white shadow rounded p-6 overflow-x-auto">
+        <h2 class="text-xl font-semibold mb-4">Recent Users</h2>
+        <table class="min-w-full table-auto">
+          <thead>
+            <tr class="bg-gray-50">
+              <th class="px-4 py-2 text-left text-sm font-medium text-gray-500">ID</th>
+              <th class="px-4 py-2 text-left text-sm font-medium text-gray-500">Email</th>
+              <th class="px-4 py-2 text-left text-sm font-medium text-gray-500">Created</th>
+            </tr>
+          </thead>
+          <tbody id="recentUsersBody">
+            <tr>
+              <td colspan="3" class="px-4 py-8 text-center text-gray-500">Loading...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="/admin.js"></script>
+</body>
+</html>

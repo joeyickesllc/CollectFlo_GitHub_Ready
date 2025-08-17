@@ -125,10 +125,14 @@ function updateAuthenticatedNavigation(user) {
   const userMenu = document.getElementById('user-menu');
 
   if (navLinks) {
-    navLinks.innerHTML = `
-      <a href="/dashboard" class="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Dashboard</a>
-      <a href="/settings" class="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Settings</a>
-    `;
+    const links = [
+      '<a href="/dashboard" class="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Dashboard</a>',
+      '<a href="/settings" class="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Settings</a>'
+    ];
+    if (user && user.role === 'admin') {
+      links.push('<a href="/admin" class="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">Admin</a>');
+    }
+    navLinks.innerHTML = links.join('\n');
   }
 
   if (userMenu) {
