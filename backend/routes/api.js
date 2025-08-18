@@ -1254,6 +1254,110 @@ router.post('/create-admin', async (req, res, next) => {
 });
 
 /**
+ * Promote User to Admin Route (protected by environment variable)
+ * Only works when ADMIN_SETUP_SECRET is set in environment
+ */
+router.post('/promote-to-admin', async (req, res, next) => {
+  try {
+    const { email, admin_secret } = req.body;
+    
+    // Check if admin setup is enabled and secret matches
+    const expectedSecret = process.env.ADMIN_SETUP_SECRET;
+    if (!expectedSecret || admin_secret !== expectedSecret) {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin setup not available or invalid secret'
+      });
+    }
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      });
+    }
+
+    // Find the user
+    const user = await db.queryOne('SELECT id, name, email, role, subscription_status FROM users WHERE email = $1', [email]);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found. Please sign up first at /beta-signup'
+      });
+    }
+
+    if (user.role === 'admin') {
+      return res.status(200).json({
+        success: true,
+        message: 'User is already an admin',
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role
+        }
+      });
+    }
+
+    // Try to promote with trial fields, fall back to basic promotion
+    try {
+      await db.execute(
+        `UPDATE users SET 
+          role = $1, 
+          subscription_status = $2,
+          subscription_start_date = $3,
+          trial_end_date = $4
+         WHERE id = $5`,
+        ['admin', 'active', new Date(), new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), user.id]
+      );
+      
+      logger.info('User promoted to admin with full subscription', {
+        userId: user.id,
+        email: user.email
+      });
+
+    } catch (error) {
+      // Fall back to basic promotion if trial fields don't exist
+      if (error.message.includes('column') && error.message.includes('does not exist')) {
+        await db.execute('UPDATE users SET role = $1 WHERE id = $2', ['admin', user.id]);
+        
+        logger.info('User promoted to admin (basic mode)', {
+          userId: user.id,
+          email: user.email,
+          note: 'Trial fields not available'
+        });
+      } else {
+        throw error;
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'User promoted to admin successfully',
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: 'admin'
+      },
+      access: {
+        login: 'https://www.collectflo.com/login',
+        admin: 'https://www.collectflo.com/admin',
+        betaStats: 'https://www.collectflo.com/beta-stats.html'
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error promoting user to admin', { error: error.message, email: req.body.email });
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to promote user to admin'
+    });
+  }
+});
+
+/**
  * Stripe Subscription Routes
  * Handle subscription checkout and webhook events
  */
