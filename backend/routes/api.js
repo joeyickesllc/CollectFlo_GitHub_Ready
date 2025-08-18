@@ -960,7 +960,7 @@ router.get('/follow-ups/scheduler/status', requireAuth, async (req, res, next) =
   }
 });
 
-router.post('/follow-ups/debug', requireAuth, requireRole('admin'), async (req, res, next) => {
+router.post('/follow-ups/debug', requireAuth, async (req, res, next) => {
   try {
     const { companyId } = req.body;
     const targetCompanyId = companyId || req.user.company_id;
