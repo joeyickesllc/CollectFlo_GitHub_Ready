@@ -963,25 +963,53 @@ router.get('/follow-ups/scheduler/status', requireAuth, async (req, res, next) =
 router.post('/follow-ups/debug', requireAuth, async (req, res, next) => {
   try {
     const { companyId } = req.body;
-    const targetCompanyId = companyId || req.user.company_id;
+    const isAdmin = req.user.role === 'admin';
     
-    // Get ALL follow-ups for this company (not just pending)
-    const allFollowUps = await db.query(`
-      SELECT * FROM follow_ups 
-      WHERE company_id = $1 
-      ORDER BY created_at DESC
-      LIMIT 15
-    `, [targetCompanyId]);
+    // If admin and no specific company requested, show all companies
+    const targetCompanyId = companyId || (isAdmin ? null : req.user.company_id);
+    
+    let allFollowUps, recentInvoices, company;
+    
+    if (targetCompanyId) {
+      // Specific company requested
+      allFollowUps = await db.query(`
+        SELECT f.*, c.name as company_name FROM follow_ups f
+        JOIN companies c ON c.id = f.company_id
+        WHERE f.company_id = $1 
+        ORDER BY f.created_at DESC
+        LIMIT 15
+      `, [targetCompanyId]);
+      
+      recentInvoices = await db.query(`
+        SELECT * FROM invoices 
+        WHERE company_id = $1 
+        ORDER BY due_date DESC 
+        LIMIT 5
+      `, [targetCompanyId]);
+      
+      company = await db.queryOne(`
+        SELECT id, name FROM companies WHERE id = $1
+      `, [targetCompanyId]);
+    } else {
+      // Admin view - show all companies
+      allFollowUps = await db.query(`
+        SELECT f.*, c.name as company_name FROM follow_ups f
+        JOIN companies c ON c.id = f.company_id
+        ORDER BY f.created_at DESC
+        LIMIT 25
+      `);
+      
+      recentInvoices = await db.query(`
+        SELECT i.*, c.name as company_name FROM invoices i
+        JOIN companies c ON c.id = i.company_id
+        ORDER BY i.due_date DESC 
+        LIMIT 10
+      `);
+      
+      company = { id: 'ALL', name: 'All Companies (Admin View)' };
+    }
     
     const pendingFollowUps = allFollowUps.filter(f => f.status === 'pending');
-    
-    // Get recent invoices for this company
-    const recentInvoices = await db.query(`
-      SELECT * FROM invoices 
-      WHERE company_id = $1 
-      ORDER BY due_date DESC 
-      LIMIT 5
-    `, [targetCompanyId]);
     
     // Check admin stats to compare
     const adminStats = await db.query(`
@@ -992,11 +1020,6 @@ router.post('/follow-ups/debug', requireAuth, async (req, res, next) => {
         COUNT(*)::int as total_followups
       FROM follow_ups
     `);
-    
-    // Get company info
-    const company = await db.queryOne(`
-      SELECT id, name FROM companies WHERE id = $1
-    `, [targetCompanyId]);
     
     // Check follow-up rules
     const { getFollowUpRules } = require('../../services/followUpService');
@@ -1009,8 +1032,10 @@ router.post('/follow-ups/debug', requireAuth, async (req, res, next) => {
     res.json({
       success: true,
       debug: {
+        user: { id: req.user.id, role: req.user.role, company_id: req.user.company_id },
         company: company,
         companyId: targetCompanyId,
+        isAdminView: !targetCompanyId && isAdmin,
         allFollowUps: allFollowUps,
         pendingFollowUps: pendingFollowUps,
         pendingCount: pendingFollowUps.length,
