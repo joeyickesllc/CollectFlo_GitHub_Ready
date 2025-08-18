@@ -56,9 +56,97 @@ async function initAdmin() {
     setText('followupsDelivered', s.followUps?.delivered ?? '-');
 
     renderRecentUsers(s.recentUsers);
+    renderPageAnalytics(s.pageViews);
   } catch (err) {
     console.error('Admin load error:', err);
     showError(err.message || 'Failed to load admin stats');
+  }
+}
+
+function renderPageAnalytics(pageViews) {
+  if (!pageViews) return;
+
+  // Update total page views in header
+  setText('totalPageViews', pageViews.totalViews || '-');
+
+  // Render top pages by views
+  const topPagesEl = document.getElementById('topPagesByViews');
+  if (topPagesEl && pageViews.topPages) {
+    topPagesEl.innerHTML = '';
+    if (pageViews.topPages.length === 0) {
+      topPagesEl.innerHTML = '<div class="text-center text-gray-500 py-4">No page data available</div>';
+    } else {
+      pageViews.topPages.forEach(page => {
+        const div = document.createElement('div');
+        div.className = 'flex justify-between items-center py-2 border-b border-gray-100';
+        div.innerHTML = `
+          <span class="text-sm font-medium">${page.page}</span>
+          <span class="text-sm text-gray-600">${page.views} views</span>
+        `;
+        topPagesEl.appendChild(div);
+      });
+    }
+  }
+
+  // Render traffic sources
+  const sourcesEl = document.getElementById('trafficSources');
+  if (sourcesEl && pageViews.sources) {
+    sourcesEl.innerHTML = '';
+    if (pageViews.sources.length === 0) {
+      sourcesEl.innerHTML = '<div class="text-center text-gray-500 py-4">No source data available</div>';
+    } else {
+      pageViews.sources.forEach(source => {
+        const div = document.createElement('div');
+        div.className = 'flex justify-between items-center py-2 border-b border-gray-100';
+        div.innerHTML = `
+          <span class="text-sm font-medium">${source.source || 'Direct'}</span>
+          <span class="text-sm text-gray-600">${source.visits} visits</span>
+        `;
+        sourcesEl.appendChild(div);
+      });
+    }
+  }
+
+  // Render page performance
+  const perfEl = document.getElementById('pagePerformance');
+  if (perfEl && pageViews.performance) {
+    perfEl.innerHTML = '';
+    if (pageViews.performance.length === 0) {
+      perfEl.innerHTML = '<div class="text-center text-gray-500 py-4">No performance data available</div>';
+    } else {
+      pageViews.performance.forEach(perf => {
+        const div = document.createElement('div');
+        div.className = 'py-2 border-b border-gray-100';
+        div.innerHTML = `
+          <div class="text-sm font-medium">${perf.page}</div>
+          <div class="text-xs text-gray-600 mt-1">
+            ${perf.unique_users} unique users, ${perf.active_days} active days
+          </div>
+        `;
+        perfEl.appendChild(div);
+      });
+    }
+  }
+
+  // Render detailed analytics table
+  const detailedEl = document.getElementById('detailedPageAnalytics');
+  if (detailedEl && pageViews.detailed) {
+    detailedEl.innerHTML = '';
+    if (pageViews.detailed.length === 0) {
+      detailedEl.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">No detailed analytics available</td></tr>';
+    } else {
+      pageViews.detailed.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="px-4 py-2 text-sm text-gray-700">${row.page}</td>
+          <td class="px-4 py-2 text-sm text-gray-700">${row.total_views}</td>
+          <td class="px-4 py-2 text-sm text-gray-700">${row.unique_users}</td>
+          <td class="px-4 py-2 text-sm text-gray-700">${row.active_days}</td>
+          <td class="px-4 py-2 text-sm text-gray-700">${row.last_visit ? new Date(row.last_visit).toLocaleDateString() : '-'}</td>
+        `;
+        detailedEl.appendChild(tr);
+      });
+    }
   }
 }
 

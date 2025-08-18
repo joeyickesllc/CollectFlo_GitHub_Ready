@@ -1485,6 +1485,87 @@ router.get('/admin/stats', requireAuth, requireRole('admin'), async (req, res, n
       LIMIT 10
     `);
 
+    // Page view analytics
+    let pageViewStats = {
+      totalPageViews: 0,
+      pagesByEndpoint: [],
+      pagesBySource: [],
+      topPages: []
+    };
+
+    try {
+      // Total page views
+      const totalViews = await db.queryOne(`
+        SELECT COUNT(*)::int AS count 
+        FROM user_activity 
+        WHERE activity_type = 'page_visit'
+      `);
+
+      // Page views by endpoint (path)
+      const viewsByEndpoint = await db.query(`
+        SELECT 
+          details->>'path' as path,
+          COUNT(*)::int as views,
+          COUNT(DISTINCT user_id)::int as unique_users
+        FROM user_activity 
+        WHERE activity_type = 'page_visit' 
+        AND details->>'path' IS NOT NULL
+        GROUP BY details->>'path'
+        ORDER BY views DESC
+        LIMIT 10
+      `);
+
+      // Page views by referral source  
+      const viewsBySource = await db.query(`
+        SELECT 
+          CASE 
+            WHEN details->>'referrer' IS NULL OR details->>'referrer' = '' THEN 'Direct'
+            WHEN details->>'referrer' LIKE '%google%' THEN 'Google'
+            WHEN details->>'referrer' LIKE '%facebook%' THEN 'Facebook'
+            WHEN details->>'referrer' LIKE '%twitter%' THEN 'Twitter'
+            WHEN details->>'referrer' LIKE '%linkedin%' THEN 'LinkedIn'
+            WHEN details->>'referrer' LIKE '%youtube%' THEN 'YouTube'
+            WHEN details->>'referrer' LIKE '%reddit%' THEN 'Reddit'
+            WHEN details->>'source' IS NOT NULL THEN details->>'source'
+            ELSE 'Other'
+          END as source,
+          COUNT(*)::int as views,
+          COUNT(DISTINCT user_id)::int as unique_users
+        FROM user_activity 
+        WHERE activity_type = 'page_visit'
+        GROUP BY source
+        ORDER BY views DESC
+        LIMIT 10
+      `);
+
+      // Top pages with additional details
+      const topPages = await db.query(`
+        SELECT 
+          details->>'path' as path,
+          COUNT(*)::int as views,
+          COUNT(DISTINCT user_id)::int as unique_users,
+          COUNT(DISTINCT DATE(created_at))::int as active_days,
+          MAX(created_at) as last_visit
+        FROM user_activity 
+        WHERE activity_type = 'page_visit' 
+        AND details->>'path' IS NOT NULL
+        GROUP BY details->>'path'
+        ORDER BY views DESC
+        LIMIT 15
+      `);
+
+      pageViewStats = {
+        totalPageViews: totalViews?.count || 0,
+        pagesByEndpoint: viewsByEndpoint || [],
+        pagesBySource: viewsBySource || [],
+        topPages: topPages || []
+      };
+
+    } catch (error) {
+      logger.warn('Could not fetch page view statistics', { error: error.message });
+      // Continue with empty stats if user_activity table doesn't exist yet
+    }
+
     return res.json({
       success: true,
       stats: {
@@ -1500,6 +1581,7 @@ router.get('/admin/stats', requireAuth, requireRole('admin'), async (req, res, n
           pending: followUpsAgg?.pending || 0,
           delivered: followUpsAgg?.delivered || 0
         },
+        pageViews: pageViewStats,
         recentUsers: recentUsers || []
       }
     });

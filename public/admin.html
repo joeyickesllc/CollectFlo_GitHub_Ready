@@ -12,7 +12,7 @@
 
     <div id="admin-alert" class="hidden bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded mb-6"></div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
       <div class="bg-white shadow rounded p-6">
         <div class="text-sm text-gray-500">Users</div>
         <div id="usersCount" class="text-3xl font-semibold mt-2">-</div>
@@ -20,6 +20,10 @@
       <div class="bg-white shadow rounded p-6">
         <div class="text-sm text-gray-500">Companies</div>
         <div id="companiesCount" class="text-3xl font-semibold mt-2">-</div>
+      </div>
+      <div class="bg-white shadow rounded p-6">
+        <div class="text-sm text-gray-500">Page Views</div>
+        <div id="totalPageViews" class="text-3xl font-semibold mt-2">-</div>
       </div>
       <div class="bg-white shadow rounded p-6">
         <div class="text-sm text-gray-500">Invoices</div>
@@ -57,6 +61,60 @@
             </tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- Page Analytics Section -->
+    <div class="mt-8">
+      <h2 class="text-2xl font-semibold mb-6">Page Analytics</h2>
+      
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <!-- Top Pages by Views -->
+        <div class="bg-white shadow rounded p-6">
+          <h3 class="text-lg font-semibold mb-4">Top Pages by Views</h3>
+          <div id="topPagesByViews" class="space-y-2">
+            <div class="text-center text-gray-500 py-4">Loading...</div>
+          </div>
+        </div>
+
+        <!-- Traffic Sources -->
+        <div class="bg-white shadow rounded p-6">
+          <h3 class="text-lg font-semibold mb-4">Traffic Sources</h3>
+          <div id="trafficSources" class="space-y-2">
+            <div class="text-center text-gray-500 py-4">Loading...</div>
+          </div>
+        </div>
+
+        <!-- Page Performance -->
+        <div class="bg-white shadow rounded p-6">
+          <h3 class="text-lg font-semibold mb-4">Page Performance</h3>
+          <div id="pagePerformance" class="space-y-2">
+            <div class="text-center text-gray-500 py-4">Loading...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detailed Page Analytics Table -->
+      <div class="bg-white shadow rounded p-6">
+        <h3 class="text-lg font-semibold mb-4">Detailed Page Analytics</h3>
+        <div class="overflow-x-auto">
+          <table class="min-w-full table-auto">
+            <thead>
+              <tr class="bg-gray-50">
+                <th class="px-4 py-2 text-left text-sm font-medium text-gray-500">Page</th>
+                <th class="px-4 py-2 text-left text-sm font-medium text-gray-500">Total Views</th>
+                <th class="px-4 py-2 text-left text-sm font-medium text-gray-500">Unique Users</th>
+                <th class="px-4 py-2 text-left text-sm font-medium text-gray-500">Active Days</th>
+                <th class="px-4 py-2 text-left text-sm font-medium text-gray-500">Last Visit</th>
+              </tr>
+            </thead>
+            <tbody id="detailedPageAnalytics">
+              <tr>
+                <td colspan="5" class="px-4 py-8 text-center text-gray-500">Loading...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
