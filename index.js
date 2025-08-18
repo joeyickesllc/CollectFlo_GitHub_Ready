@@ -462,6 +462,7 @@ const htmlRoutes = [
   { path: '/beta-signup', file: 'beta-signup.html' },
   { path: '/beta-onboarding', file: 'beta-onboarding.html', auth: true },
   { path: '/beta-stats', file: 'beta-stats.html', auth: true },
+  { path: '/admin', file: 'admin.html', auth: true, admin: true },
   { path: '/pay/:invoiceId', file: 'pay.html' },
   { path: '/payment-success', file: 'payment-success.html' },
   { path: '/privacy', file: 'privacy.html' },
@@ -482,13 +483,19 @@ htmlRoutes.forEach(route => {
       }
 
       // Verify token; clear cookies & redirect on failure
+      let decoded;
       try {
-        jwtService.verifyToken(token, 'access');
+        decoded = jwtService.verifyToken(token, 'access');
       } catch (err) {
         // Invalid / expired token – clean up and force re-login
         res.clearCookie('accessToken', { path: '/' });
         res.clearCookie('refreshToken', { path: '/' });
         return res.redirect('/login?redirect=' + encodeURIComponent(req.path));
+      }
+
+      // If route requires admin, enforce role check
+      if (route.admin && (!decoded || decoded.role !== 'admin')) {
+        return res.status(403).sendFile(path.join(__dirname, 'public', '404.html'));
       }
     }
     

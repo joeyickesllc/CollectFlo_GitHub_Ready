@@ -32,7 +32,7 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/backend/tests/jest.setup.js'],
   
   // Code coverage configuration
-  collectCoverage: true,
+  collectCoverage: false,
   collectCoverageFrom: [
     'backend/**/*.js',
     '!backend/tests/**/*.js',
@@ -84,8 +84,5 @@ module.exports = {
     '/coverage/'
   ],
   
-  // Global variables available in tests
-  globals: {
-    NODE_ENV: 'test'
-  }
+
 };

@@ -32,6 +32,7 @@ try {
 const {
   requireAuth,
   optionalAuth,
+  requireRole,
 } = require('../middleware/jwtAuthMiddleware');
 const errorMiddleware = require('../middleware/errorMiddleware');
 const { trackPageVisit, trackBetaSignup, trackLogin, trackUserAction } = require('../middleware/trackingMiddleware');
@@ -1348,6 +1349,60 @@ router.post('/create-checkout-session', requireAuth, checkTrialStatus, async (re
   }
 });
 
+/**
+ * Admin Routes
+ */
+router.get('/admin/stats', requireAuth, requireRole('admin'), async (req, res, next) => {
+  try {
+    // Basic aggregated stats
+    const usersCount = await db.queryOne('SELECT COUNT(*)::int AS count FROM users');
+    const companiesCount = await db.queryOne('SELECT COUNT(*)::int AS count FROM companies');
+
+    const invoicesAgg = await db.queryOne(`
+      SELECT 
+        COUNT(*)::int AS total,
+        COUNT(CASE WHEN status = 'outstanding' THEN 1 END)::int AS outstanding,
+        COALESCE(SUM(CASE WHEN status = 'outstanding' THEN amount ELSE 0 END), 0)::numeric AS total_outstanding
+      FROM invoices
+    `);
+
+    const followUpsAgg = await db.queryOne(`
+      SELECT 
+        COUNT(*)::int AS total,
+        COUNT(CASE WHEN status = 'pending' THEN 1 END)::int AS pending,
+        COUNT(CASE WHEN status = 'delivered' THEN 1 END)::int AS delivered
+      FROM follow_ups
+    `);
+
+    const recentUsers = await db.query(`
+      SELECT id, email, created_at 
+      FROM users 
+      ORDER BY created_at DESC 
+      LIMIT 10
+    `);
+
+    return res.json({
+      success: true,
+      stats: {
+        users: usersCount?.count || 0,
+        companies: companiesCount?.count || 0,
+        invoices: {
+          total: invoicesAgg?.total || 0,
+          outstanding: invoicesAgg?.outstanding || 0,
+          totalOutstandingAmount: parseFloat(invoicesAgg?.total_outstanding || 0)
+        },
+        followUps: {
+          total: followUpsAgg?.total || 0,
+          pending: followUpsAgg?.pending || 0,
+          delivered: followUpsAgg?.delivered || 0
+        },
+        recentUsers: recentUsers || []
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 // Centralized error handling for API routes
 router.use(errorMiddleware);
