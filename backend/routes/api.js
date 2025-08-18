@@ -1052,6 +1052,46 @@ router.post('/follow-ups/debug', requireAuth, async (req, res, next) => {
   }
 });
 
+router.post('/follow-ups/force-send', requireAuth, async (req, res, next) => {
+  try {
+    const { followUpId, companyId } = req.body;
+    
+    if (followUpId) {
+      // Force send a specific follow-up
+      const followUp = await db.queryOne('SELECT * FROM follow_ups WHERE id = $1', [followUpId]);
+      if (!followUp) {
+        return res.status(404).json({ success: false, message: 'Follow-up not found' });
+      }
+      
+      const { processFollowUp } = require('../../services/followUpProcessor');
+      const result = await processFollowUp(followUp);
+      
+      return res.json({
+        success: true,
+        message: 'Follow-up processing attempted',
+        result
+      });
+    }
+    
+    // Or update all pending follow-ups for a company to be due now
+    if (companyId) {
+      await db.query(
+        'UPDATE follow_ups SET scheduled_at = NOW() WHERE company_id = $1 AND status = $2',
+        [companyId, 'pending']
+      );
+      
+      return res.json({
+        success: true,
+        message: `Updated all pending follow-ups for company ${companyId} to be due now`
+      });
+    }
+    
+    res.status(400).json({ success: false, message: 'followUpId or companyId required' });
+  } catch (error) {
+    next(error);
+  }
+});
+
 /**
  * Test Routes (for development only)
  */
