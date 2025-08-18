@@ -1555,10 +1555,27 @@ router.get('/admin/stats', requireAuth, requireRole('admin'), async (req, res, n
       `);
 
       pageViewStats = {
-        totalPageViews: totalViews?.count || 0,
-        pagesByEndpoint: viewsByEndpoint || [],
-        pagesBySource: viewsBySource || [],
-        topPages: topPages || []
+        totalViews: totalViews?.count || 0,
+        topPages: (topPages || []).map(p => ({
+          page: p.path,
+          views: p.views
+        })),
+        sources: (viewsBySource || []).map(s => ({
+          source: s.source,
+          visits: s.views
+        })),
+        performance: (topPages || []).map(p => ({
+          page: p.path,
+          unique_users: p.unique_users,
+          active_days: p.active_days
+        })),
+        detailed: (topPages || []).map(p => ({
+          page: p.path,
+          total_views: p.views,
+          unique_users: p.unique_users,
+          active_days: p.active_days,
+          last_visit: p.last_visit
+        }))
       };
 
     } catch (error) {
