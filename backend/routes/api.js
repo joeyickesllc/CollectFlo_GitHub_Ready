@@ -1055,6 +1055,7 @@ router.post('/follow-ups/debug', requireAuth, async (req, res, next) => {
 router.post('/follow-ups/force-send', requireAuth, async (req, res, next) => {
   try {
     const { followUpId, companyId } = req.body;
+    const isAdmin = req.user.role === 'admin';
     
     if (followUpId) {
       // Force send a specific follow-up
@@ -1075,18 +1076,49 @@ router.post('/follow-ups/force-send', requireAuth, async (req, res, next) => {
     
     // Or update all pending follow-ups for a company to be due now
     if (companyId) {
-      await db.query(
+      // Check if user can access this company
+      if (!isAdmin && req.user.company_id !== companyId) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Not authorized to modify follow-ups for this company' 
+        });
+      }
+      
+      const updateResult = await db.query(
         'UPDATE follow_ups SET scheduled_at = NOW() WHERE company_id = $1 AND status = $2',
         [companyId, 'pending']
       );
       
       return res.json({
         success: true,
-        message: `Updated all pending follow-ups for company ${companyId} to be due now`
+        message: `Updated all pending follow-ups for company ${companyId} to be due now`,
+        updatedCount: updateResult.rowCount || 0
       });
     }
     
     res.status(400).json({ success: false, message: 'followUpId or companyId required' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/follow-ups/admin-process', requireAuth, async (req, res, next) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Admin access required' });
+    }
+    
+    const { companyId, limit = 5 } = req.body;
+    
+    const { triggerManualProcessing } = require('../../services/followUpScheduler');
+    const results = await triggerManualProcessing(false);
+    
+    res.json({
+      success: true,
+      message: 'Admin follow-up processing completed',
+      results,
+      companyRequested: companyId
+    });
   } catch (error) {
     next(error);
   }
