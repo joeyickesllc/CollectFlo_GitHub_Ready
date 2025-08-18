@@ -965,13 +965,15 @@ router.post('/follow-ups/debug', requireAuth, async (req, res, next) => {
     const { companyId } = req.body;
     const targetCompanyId = companyId || req.user.company_id;
     
-    // Get pending follow-ups
-    const pendingFollowUps = await db.query(`
+    // Get ALL follow-ups for this company (not just pending)
+    const allFollowUps = await db.query(`
       SELECT * FROM follow_ups 
-      WHERE company_id = $1 AND status = 'pending'
-      ORDER BY scheduled_at ASC
-      LIMIT 10
+      WHERE company_id = $1 
+      ORDER BY created_at DESC
+      LIMIT 15
     `, [targetCompanyId]);
+    
+    const pendingFollowUps = allFollowUps.filter(f => f.status === 'pending');
     
     // Get recent invoices for this company
     const recentInvoices = await db.query(`
@@ -979,6 +981,21 @@ router.post('/follow-ups/debug', requireAuth, async (req, res, next) => {
       WHERE company_id = $1 
       ORDER BY due_date DESC 
       LIMIT 5
+    `, [targetCompanyId]);
+    
+    // Check admin stats to compare
+    const adminStats = await db.query(`
+      SELECT 
+        COUNT(CASE WHEN status = 'pending' THEN 1 END)::int as pending_total,
+        COUNT(CASE WHEN status = 'sent' THEN 1 END)::int as sent_total,
+        COUNT(CASE WHEN status = 'failed' THEN 1 END)::int as failed_total,
+        COUNT(*)::int as total_followups
+      FROM follow_ups
+    `);
+    
+    // Get company info
+    const company = await db.queryOne(`
+      SELECT id, name FROM companies WHERE id = $1
     `, [targetCompanyId]);
     
     // Check follow-up rules
@@ -992,13 +1009,17 @@ router.post('/follow-ups/debug', requireAuth, async (req, res, next) => {
     res.json({
       success: true,
       debug: {
+        company: company,
         companyId: targetCompanyId,
+        allFollowUps: allFollowUps,
         pendingFollowUps: pendingFollowUps,
         pendingCount: pendingFollowUps.length,
         recentInvoices: recentInvoices,
         followUpRules: rules,
         activeRules: rules.filter(r => r.active),
-        scheduler: schedulerStatus
+        scheduler: schedulerStatus,
+        globalStats: adminStats[0] || {},
+        currentTime: new Date().toISOString()
       }
     });
   } catch (error) {
