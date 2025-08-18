@@ -960,6 +960,52 @@ router.get('/follow-ups/scheduler/status', requireAuth, async (req, res, next) =
   }
 });
 
+router.post('/follow-ups/debug', requireAuth, requireRole('admin'), async (req, res, next) => {
+  try {
+    const { companyId } = req.body;
+    const targetCompanyId = companyId || req.user.company_id;
+    
+    // Get pending follow-ups
+    const pendingFollowUps = await db.query(`
+      SELECT * FROM follow_ups 
+      WHERE company_id = $1 AND status = 'pending'
+      ORDER BY scheduled_at ASC
+      LIMIT 10
+    `, [targetCompanyId]);
+    
+    // Get recent invoices for this company
+    const recentInvoices = await db.query(`
+      SELECT * FROM invoices 
+      WHERE company_id = $1 
+      ORDER BY due_date DESC 
+      LIMIT 5
+    `, [targetCompanyId]);
+    
+    // Check follow-up rules
+    const { getFollowUpRules } = require('../../services/followUpService');
+    const rules = await getFollowUpRules(targetCompanyId);
+    
+    // Get scheduler status
+    const { getSchedulerStatus } = require('../../services/followUpScheduler');
+    const schedulerStatus = getSchedulerStatus();
+    
+    res.json({
+      success: true,
+      debug: {
+        companyId: targetCompanyId,
+        pendingFollowUps: pendingFollowUps,
+        pendingCount: pendingFollowUps.length,
+        recentInvoices: recentInvoices,
+        followUpRules: rules,
+        activeRules: rules.filter(r => r.active),
+        scheduler: schedulerStatus
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 /**
  * Test Routes (for development only)
  */
