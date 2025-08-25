@@ -1,8 +1,33 @@
 // Timezone utility functions for Central Standard Time
 // ------------------------------------------------------------------
-function formatDateCST(dateString) {
-  if (!dateString) return 'N/A';
-  const date = new Date(dateString + 'T00:00:00');
+function formatDateCST(dateValue) {
+  if (!dateValue) return 'N/A';
+  
+  let date;
+  // Handle different input types
+  if (dateValue instanceof Date) {
+    // Already a Date object
+    date = dateValue;
+  } else if (typeof dateValue === 'string') {
+    // Handle string formats
+    if (dateValue.includes('T') || dateValue.includes('Z')) {
+      // Already has time component or is ISO string
+      date = new Date(dateValue);
+    } else {
+      // Just a date string like "2025-08-26", treat as local date
+      date = new Date(dateValue + 'T00:00:00');
+    }
+  } else {
+    // Try to convert whatever it is to a Date
+    date = new Date(dateValue);
+  }
+  
+  // Check if date is valid
+  if (isNaN(date.getTime())) {
+    console.warn('Invalid date:', dateValue);
+    return 'Invalid Date';
+  }
+  
   return date.toLocaleDateString('en-US', {
     timeZone: 'America/Chicago',
     month: 'numeric',
