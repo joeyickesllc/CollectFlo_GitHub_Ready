@@ -1,3 +1,16 @@
+// Timezone utility functions for Central Standard Time
+// ------------------------------------------------------------------
+function formatDateCST(dateString) {
+  if (!dateString) return 'N/A';
+  const date = new Date(dateString + 'T00:00:00');
+  return date.toLocaleDateString('en-US', {
+    timeZone: 'America/Chicago',
+    month: 'numeric',
+    day: 'numeric', 
+    year: 'numeric'
+  });
+}
+
 // Check authentication status on page load
 // ------------------------------------------------------------------
 // Centralised login redirect helper
@@ -83,10 +96,10 @@ async function updateInvoices() {
         </td>
         <td class="px-6 py-4">${invoice.invoice_id}</td>
         <td class="px-6 py-4">${invoice.customer_name}</td>
-        <td class="px-6 py-4">${new Date(invoice.due_date).toLocaleDateString()}</td>
+        <td class="px-6 py-4">${formatDateCST(invoice.due_date)}</td>
         <td class="px-6 py-4">$${invoice.amount.toFixed(2)}</td>
         <td class="px-6 py-4">${invoice.status}</td>
-        <td class="px-6 py-4">${invoice.next_followup ? new Date(invoice.next_followup).toLocaleDateString() : 'N/A'}</td>
+        <td class="px-6 py-4">${invoice.next_followup ? formatDateCST(invoice.next_followup) : 'N/A'}</td>
       </tr>
     `).join('');
   } catch (error) {
@@ -244,13 +257,13 @@ function displayInvoices(invoices) {
             <td class="px-4 py-3 text-sm font-medium">${invoice.invoice_id}</td>
             <td class="px-4 py-3 text-sm">${invoice.customer_name}</td>
             <td class="px-4 py-3 text-sm">$${(invoice.balance || 0).toLocaleString()}</td>
-            <td class="px-4 py-3 text-sm">${new Date(invoice.due_date).toLocaleDateString()}</td>
+            <td class="px-4 py-3 text-sm">${formatDateCST(invoice.due_date)}</td>
             <td class="px-4 py-3 text-sm">
                 <span class="px-2 py-1 text-xs rounded-full ${getStatusColor(invoice.status)}">
                     ${invoice.status}
                 </span>
             </td>
-            <td class="px-4 py-3 text-sm">${invoice.scheduled_date ? new Date(invoice.scheduled_date).toLocaleDateString() : 'N/A'}</td>
+            <td class="px-4 py-3 text-sm">${invoice.scheduled_date ? formatDateCST(invoice.scheduled_date) : 'N/A'}</td>
         </tr>
     `).join('');
 }

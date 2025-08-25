@@ -1,3 +1,15 @@
+// Timezone utility function for Central Standard Time
+function formatDateCST(dateString) {
+  if (!dateString) return '-';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    timeZone: 'America/Chicago',
+    month: 'numeric',
+    day: 'numeric', 
+    year: 'numeric'
+  });
+}
+
 async function fetchAdminStats() {
   const res = await fetch('/api/admin/stats', { credentials: 'include' });
   if (!res.ok) {
@@ -142,7 +154,7 @@ function renderPageAnalytics(pageViews) {
           <td class="px-4 py-2 text-sm text-gray-700">${row.total_views}</td>
           <td class="px-4 py-2 text-sm text-gray-700">${row.unique_users}</td>
           <td class="px-4 py-2 text-sm text-gray-700">${row.active_days}</td>
-          <td class="px-4 py-2 text-sm text-gray-700">${row.last_visit ? new Date(row.last_visit).toLocaleDateString() : '-'}</td>
+          <td class="px-4 py-2 text-sm text-gray-700">${formatDateCST(row.last_visit)}</td>
         `;
         detailedEl.appendChild(tr);
       });

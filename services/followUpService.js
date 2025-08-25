@@ -125,6 +125,18 @@ async function saveFollowUpRules(companyId, rules) {
 }
 
 /**
+ * Get current date in CST timezone
+ * @returns {Date} Date object in CST
+ */
+function getCSTDate() {
+  const now = new Date();
+  const cstOffset = -6 * 60; // CST is UTC-6 (in minutes)
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const cstTime = new Date(utc + (cstOffset * 60000));
+  return cstTime;
+}
+
+/**
  * Calculate days overdue for an invoice
  * @param {string} dueDate - Invoice due date (YYYY-MM-DD)
  * @returns {number} Days overdue (negative if not due yet)
@@ -132,8 +144,8 @@ async function saveFollowUpRules(companyId, rules) {
 function calculateDaysOverdue(dueDate) {
   if (!dueDate) return 0;
   
-  const due = new Date(dueDate);
-  const today = new Date();
+  const due = new Date(dueDate + 'T00:00:00');
+  const today = getCSTDate();
   today.setHours(0, 0, 0, 0); // Start of day
   due.setHours(0, 0, 0, 0);
   
@@ -177,12 +189,12 @@ async function createFollowUpsForInvoice(invoice, companyId, customerId = null) 
     });
     
     for (const rule of activeRules) {
-      const dueDate = new Date(invoice.due_date);
+      const dueDate = new Date(invoice.due_date + 'T00:00:00');
       const scheduledDate = new Date(dueDate);
       scheduledDate.setDate(scheduledDate.getDate() + rule.trigger_days_overdue);
       
       // Only create follow-ups for future dates or recently past dates
-      const now = new Date();
+      const now = getCSTDate();
       const maxPastDays = 1; // Allow creating follow-ups up to 1 day in the past
       const minScheduleDate = new Date(now.getTime() - (maxPastDays * 24 * 60 * 60 * 1000));
       
@@ -199,7 +211,7 @@ async function createFollowUpsForInvoice(invoice, companyId, customerId = null) 
             invoice.invoice_id,
             rule.follow_up_type,
             'pending',
-            scheduledDate.toISOString(),
+            scheduledDate.toISOString().split('T')[0], // Store as YYYY-MM-DD date only
             `${rule.name}: ${rule.template_type} for invoice ${invoice.invoice_id}`
           ]);
           
@@ -348,5 +360,6 @@ module.exports = {
   processOverdueInvoices,
   getPendingFollowUps,
   getNextFollowUpDate,
+  getCSTDate,
   DEFAULT_FOLLOWUP_RULES
 };
