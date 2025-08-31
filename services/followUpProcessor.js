@@ -53,24 +53,51 @@ async function fetchInvoiceFromQuickBooks(invoiceId, userId) {
     };
 
     // Try direct GET for Invoice by Id
-    const response = await doGet(`${apiBaseUrl}${tokens.realmId}/invoice/${invoiceId}`);
-    const directInvoice = response.data?.Invoice || response.data?.QueryResponse?.Invoice?.[0];
-    if (directInvoice) {
-      return directInvoice;
+    try {
+      const response = await doGet(`${apiBaseUrl}${tokens.realmId}/invoice/${invoiceId}`);
+      const directInvoice = response.data?.Invoice || response.data?.QueryResponse?.Invoice?.[0];
+      if (directInvoice) {
+        return directInvoice;
+      }
+    } catch (directError) {
+      // Direct GET failed, continue to fallback methods
+      logger.debug('Direct invoice GET failed, trying fallback methods', { 
+        error: directError.message, 
+        invoiceId 
+      });
     }
 
-    // Fallback to query API
-    const queryResponse = await doGet(`${apiBaseUrl}${tokens.realmId}/query?query=SELECT * FROM Invoice WHERE Id = '${invoiceId}'`);
-    const invoices = queryResponse.data.QueryResponse?.Invoice || [];
-    if (invoices.length === 0) {
-      // Last fallback: DocNumber
+    // Fallback to query by ID
+    try {
+      const queryResponse = await doGet(`${apiBaseUrl}${tokens.realmId}/query?query=SELECT * FROM Invoice WHERE DocNumber = '${invoiceId}'`);
+      const invoices = queryResponse.data.QueryResponse?.Invoice || [];
+      if (invoices.length > 0) {
+        return invoices[0];
+      }
+    } catch (queryError) {
+      // Query by ID failed, continue to DocNumber fallback
+      logger.debug('Query by ID failed, trying DocNumber fallback', { 
+        error: queryError.message, 
+        invoiceId 
+      });
+    }
+
+    // Last fallback: DocNumber
+    try {
       const byDoc = await doGet(`${apiBaseUrl}${tokens.realmId}/query?query=SELECT * FROM Invoice WHERE DocNumber = '${invoiceId}'`);
       const byDocInvoices = byDoc.data.QueryResponse?.Invoice || [];
-      if (byDocInvoices.length === 0) throw new Error(`Invoice ${invoiceId} not found in QuickBooks`);
-      return byDocInvoices[0];
+      if (byDocInvoices.length > 0) {
+        return byDocInvoices[0];
+      }
+    } catch (docError) {
+      logger.debug('DocNumber query also failed', { 
+        error: docError.message, 
+        invoiceId 
+      });
     }
 
-    return invoices[0];
+    // All methods failed
+    throw new Error(`Invoice ${invoiceId} not found in QuickBooks using any method`);
   } catch (error) {
     logger.error('Error fetching invoice from QuickBooks', {
       error: error.message,

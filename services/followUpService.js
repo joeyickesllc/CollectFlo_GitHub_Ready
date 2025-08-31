@@ -130,10 +130,9 @@ async function saveFollowUpRules(companyId, rules) {
  */
 function getCSTDate() {
   const now = new Date();
-  const cstOffset = -6 * 60; // CST is UTC-6 (in minutes)
-  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-  const cstTime = new Date(utc + (cstOffset * 60000));
-  return cstTime;
+  // Use proper Central Time with automatic DST handling
+  const centralTime = new Date(now.toLocaleString("en-US", {timeZone: "America/Chicago"}));
+  return centralTime;
 }
 
 /**
@@ -211,14 +210,14 @@ async function createFollowUpsForInvoice(invoice, companyId, customerId = null) 
             invoice.invoice_id,
             rule.follow_up_type,
             'pending',
-            scheduledDate.toISOString().split('T')[0], // Store as YYYY-MM-DD date only
+            scheduledDate.toLocaleDateString('en-CA', {timeZone: 'America/Chicago'}), // Store as YYYY-MM-DD in Central Time
             `${rule.name}: ${rule.template_type} for invoice ${invoice.invoice_id}`
           ]);
           
           logger.debug('Follow-up created', {
             invoiceId: invoice.invoice_id,
             type: rule.follow_up_type,
-            scheduledAt: scheduledDate.toISOString(),
+            scheduledAt: scheduledDate.toLocaleDateString('en-CA', {timeZone: 'America/Chicago'}),
             rule: rule.name
           });
         } catch (insertError) {

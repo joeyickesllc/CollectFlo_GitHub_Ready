@@ -58,7 +58,7 @@ async function generateQuickBooksPaymentLink(invoiceId, userId) {
     };
 
     // First, get the invoice details to ensure it exists
-    const invoiceResponse = await doGet(`${apiBaseUrl}${tokens.realmId}/query?query=SELECT * FROM Invoice WHERE Id = '${invoiceId}'`);
+    const invoiceResponse = await doGet(`${apiBaseUrl}${tokens.realmId}/query?query=SELECT * FROM Invoice WHERE DocNumber = '${invoiceId}'`);
 
     const invoices = invoiceResponse.data.QueryResponse?.Invoice || [];
     if (invoices.length === 0) {
@@ -200,7 +200,7 @@ async function getInvoicePaymentStatus(invoiceId, userId) {
     };
 
     // Get current invoice status
-    const response = await doGet(`${apiBaseUrl}${tokens.realmId}/query?query=SELECT Balance, TotalAmt FROM Invoice WHERE Id = '${invoiceId}'`);
+    const response = await doGet(`${apiBaseUrl}${tokens.realmId}/query?query=SELECT Balance, TotalAmt FROM Invoice WHERE DocNumber = '${invoiceId}'`);
 
     const invoices = response.data.QueryResponse?.Invoice || [];
     if (invoices.length === 0) {
