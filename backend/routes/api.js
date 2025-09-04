@@ -1652,6 +1652,7 @@ router.get('/admin/stats', requireAuth, requireRole('admin'), async (req, res, n
     // Page view analytics
     let pageViewStats = {
       totalPageViews: 0,
+      todayViews: 0,
       pagesByEndpoint: [],
       pagesBySource: [],
       topPages: []
@@ -1663,6 +1664,14 @@ router.get('/admin/stats', requireAuth, requireRole('admin'), async (req, res, n
         SELECT COUNT(*)::int AS count 
         FROM user_activity 
         WHERE activity_type = 'page_visit'
+      `);
+
+      // Today's page views
+      const todayViews = await db.queryOne(`
+        SELECT COUNT(*)::int AS count
+        FROM user_activity
+        WHERE activity_type = 'page_visit'
+          AND DATE(created_at) = CURRENT_DATE
       `);
 
       // Page views by endpoint (path)
@@ -1720,6 +1729,7 @@ router.get('/admin/stats', requireAuth, requireRole('admin'), async (req, res, n
 
       pageViewStats = {
         totalViews: totalViews?.count || 0,
+        todayViews: todayViews?.count || 0,
         topPages: (topPages || []).map(p => ({
           page: p.path,
           views: p.views
