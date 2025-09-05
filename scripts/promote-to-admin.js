@@ -28,7 +28,7 @@ async function promoteToAdmin() {
     
     if (!user) {
       console.error(`❌ No user found with email: ${email}`);
-      console.log('Please make sure the user has signed up first at: https://www.collectflo.com/beta-signup');
+      console.log('Please make sure the user has signed up first at: https://www.collectflo.com/signup');
       process.exit(1);
     }
 

@@ -9,8 +9,10 @@ User-agent: *
 Allow: /
 Allow: /login
 Allow: /signup
-Allow: /beta
-Allow: /beta-signup
+Disallow: /beta
+Disallow: /beta-signup
+Disallow: /beta.html
+Disallow: /beta-signup.html
 Allow: /privacy
 Allow: /eula
 Allow: /help
