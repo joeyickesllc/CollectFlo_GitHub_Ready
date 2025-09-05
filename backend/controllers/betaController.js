@@ -10,8 +10,7 @@ const db = require('../db/connection');
 const logger = require('../services/logger');
 const jwtService = require('../services/jwtService');
 const {
-  setAuthCookies,
-  clearAuthCookies
+  setAuthCookies
 } = require('../middleware/jwtAuthMiddleware');
 
 /**

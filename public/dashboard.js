@@ -243,7 +243,6 @@ window.toggleExclusion = async function (invoiceId, excluded) {
 
     // Reload invoices to reflect changes
     loadInvoices();
-    loadDashboardStats();
 
   } catch (error) {
     console.error('Error toggling exclusion:', error);

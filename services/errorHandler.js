@@ -1,6 +1,6 @@
 const db = require('../backend/db/connection');
 
-async function errorHandler(err, req, res, next) {
+async function errorHandler(err, req, res) {
   try {
     await db.execute(
       `INSERT INTO error_logs (level, message, stack, meta, timestamp)
