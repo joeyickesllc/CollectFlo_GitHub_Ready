@@ -11,33 +11,33 @@ const session = require('express-session');
 const path = require('path');
 const morgan = require('morgan');
 const cors = require('cors');
-const multer = require('multer');
+// const multer = require('multer');
 const { applySecurityMiddleware } = require('./backend/middleware/securityMiddleware');
 const cookieParser = require('cookie-parser');   // <-- added
 const { optionalAuth } = require('./backend/middleware/jwtAuthMiddleware'); // new import
-const jwtService   = require('./backend/services/jwtService'); // JWT verification
+// const jwtService   = require('./backend/services/jwtService'); // JWT verification
 const secrets      = require('./backend/config/secrets');
 
 // ---------------------------------------------------------------------------
 // QuickBooks controller (optional)
 // ---------------------------------------------------------------------------
-let qboController;
-try {
-  qboController = require('./backend/controllers/qboController'); // Loads only if deps/env are present
-} catch (error) {
-  console.warn(
-    'QBO Controller not loaded – QuickBooks features disabled:',
-    error.message
-  );
-}
+// let qboController;
+// try {
+//   qboController = require('./backend/controllers/qboController'); // Loads only if deps/env are present
+// } catch (error) {
+//   console.warn(
+//     'QBO Controller not loaded – QuickBooks features disabled:',
+//     error.message
+//   );
+// }
 // Application modules
-const db = require('./backend/db/connection');
+// const db = require('./backend/db/connection');
 const apiRoutes = require('./backend/routes/api');
 const logger = require('./backend/services/logger');
 const jobQueue = require('./backend/services/jobQueue');
 
 // Migration runner
-const runMigrations = require('./backend/scripts/runMigrations');
+// const runMigrations = require('./backend/scripts/runMigrations');
 // Tracking middleware
 const { trackPageVisit } = require('./backend/middleware/trackingMiddleware');
 
@@ -55,7 +55,7 @@ if (jobQueue.usingMockImplementation) {
 const PORT = process.env.PORT || 3000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const IS_PRODUCTION = NODE_ENV === 'production';
-const IS_RENDER = process.env.RENDER === 'true';
+// const IS_RENDER = process.env.RENDER === 'true';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'collectflo-dev-secret';
 
 // HTTP server instance for graceful shutdown
@@ -174,12 +174,12 @@ app.use((req, res, next) => {
 app.use(trackPageVisit);
 
 // Configure file uploads
-const upload = multer({
-  dest: path.join(__dirname, 'uploads'),
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
-  }
-});
+// const upload = multer({
+//   dest: path.join(__dirname, 'uploads'),
+//   limits: {
+//     fileSize: 5 * 1024 * 1024, // 5MB limit
+//   }
+// });
 
 // Root route handler - MOVED BEFORE static file middleware
 app.get('/', (req, res) => {
@@ -405,98 +405,19 @@ async function handlePaymentFailed(invoice, db, logger) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// QuickBooks OAuth routes – register only when controller is available
-// ---------------------------------------------------------------------------
-if (qboController) {
-  // optionalAuth lets both logged-in & not-yet-logged-in users connect QBO
-  app.get(
-    '/auth/qbo',
-    optionalAuth,
-    (req, res, next) => qboController.initiateOAuth(req, res, next)
-  );
-
-  app.get(
-    '/auth/qbo/callback',
-    optionalAuth,
-    (req, res, next) => qboController.handleOAuthCallback(req, res, next)
-  );
-} else {
-  // Fallback route that makes it obvious QBO is disabled
-  app.get('/auth/qbo', (_, res) => {
-    res
-      .status(503)
-      .send('QuickBooks integration is currently unavailable on this deployment.');
-  });
-}
-
-// ---------------------------------------------------------------------------
-// TEMPORARY: redirect legacy /callback → /auth/qbo/callback
-// ---------------------------------------------------------------------------
-// Some QuickBooks app configurations pointed to `/callback` instead of the
-// correct `/auth/qbo/callback`.  This route preserves all query parameters
-// and forwards the request to the expected handler.
-app.get('/callback', (req, res) => {
-  const queryString = req.url.split('?')[1] || '';
-  return res.redirect(`/auth/qbo/callback${queryString ? `?${queryString}` : ''}`);
-});
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    environment: NODE_ENV
-  });
-});
-
-// Serve HTML pages for various routes
+// Dynamic routes for static HTML pages
 const htmlRoutes = [
   { path: '/login', file: 'login.html' },
-  { path: '/signup', file: 'signup.html' },
-  { path: '/dashboard', file: 'dashboard.html', auth: true },
-  { path: '/settings', file: 'settings.html', auth: true },
-  { path: '/templates', file: 'templates.html', auth: true },
-  { path: '/onboarding', file: 'onboarding.html', auth: true },
-  { path: '/beta', file: 'beta.html' },
-  { path: '/beta-signup', file: 'beta-signup.html' },
-  { path: '/beta-onboarding', file: 'beta-onboarding.html', auth: true },
-  { path: '/beta-stats', file: 'beta-stats.html', auth: true },
-  { path: '/admin', file: 'admin.html', auth: true, admin: true },
-  { path: '/pay/:invoiceId', file: 'pay.html' },
-  { path: '/payment-success', file: 'payment-success.html' },
-  { path: '/privacy', file: 'privacy.html' },
-  { path: '/eula', file: 'eula.html' },
-  { path: '/help', file: 'help.html' }
+  { path: '/dashboard', file: 'dashboard.html' },
+  { path: '/admin', file: 'admin.html' },
+  { path: '/beta', file: 'beta.html' }
 ];
 
-// Register HTML routes
 htmlRoutes.forEach(route => {
   app.get(route.path, (req, res) => {
-    // Check if route requires authentication
-    if (route.auth) {
-      const token = req.cookies && req.cookies.accessToken;
-
-      // No token at all → redirect to login
-      if (!token) {
-        return res.redirect('/login?redirect=' + encodeURIComponent(req.path));
-      }
-
-      // Verify token; clear cookies & redirect on failure
-      let decoded;
-      try {
-        decoded = jwtService.verifyToken(token, 'access');
-      } catch (err) {
-        // Invalid / expired token – clean up and force re-login
-        res.clearCookie('accessToken', { path: '/' });
-        res.clearCookie('refreshToken', { path: '/' });
-        return res.redirect('/login?redirect=' + encodeURIComponent(req.path));
-      }
-
-      // If route requires admin, enforce role check
-      if (route.admin && (!decoded || decoded.role !== 'admin')) {
-        return res.status(403).sendFile(path.join(__dirname, 'public', '404.html'));
-      }
+    if (IS_PRODUCTION && route.path === '/beta') {
+      // In production, serve a 404 for the beta page, but keep it accessible in development
+      return res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
     }
     
     res.sendFile(path.join(__dirname, 'public', route.file));
@@ -509,7 +430,7 @@ app.use((req, res) => {
 });
 
 // Error handling middleware
-app.use((err, req, res, next) => {
+app.use((err, req, res) => {
   logger.error('Unhandled error in API route: ' + req.method + ' ' + req.url, {
     method: req.method,
     url: req.url,
@@ -522,67 +443,24 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Application startup
-async function startServer() {
-  try {
-    // Run database migrations
-    await runMigrations();
-    
-    // Start the server and keep a reference for graceful shutdown
-    server = app.listen(PORT, () => {
-      logger.info(`CollectFlo server listening on port ${PORT} in ${NODE_ENV} mode`);
-    });
+// Start server
+server = app.listen(PORT, () => {
+  logger.info(`Server running on port ${PORT} in ${NODE_ENV} mode`);
+});
 
-    // Initialize scheduled jobs only after successful start
-    try {
-      const { startScheduler } = require('./services/followUpScheduler');
-      // Run follow-up processing every 5 minutes (24/7)
-      startScheduler({ followUpProcessing: '*/5 * * * *' });
-      logger.info('Follow-up scheduler initialised successfully');
-    } catch (schedErr) {
-      logger.error('Follow-up scheduler failed to initialise', { error: schedErr });
-      // Do NOT crash the whole app – core API can still function without scheduler
-    }
-  } catch (error) {
-    logger.error('Failed to start application due to startup error', { error });
-    process.exit(1); // Exit with failure so Render restarts / reports the issue
-  }
-}
-
-// Start the application
-startServer();
-
-// Handle graceful shutdown
-process.on('SIGTERM', gracefulShutdown);
-process.on('SIGINT', gracefulShutdown);
-
-async function gracefulShutdown() {
-  logger.info('Received shutdown signal, closing connections...');
-  
-  // Close the HTTP server first to stop accepting new requests
-  if (server) {
-    server.close();
-  }
-  
-  try {
-    // Shutdown job queues
-    try {
-      await jobQueue.shutdown();
-    } catch (jqErr) {
-      logger.error('Error shutting down job queues', { error: jqErr });
-    }
-
-    // Close database connections
-    try {
-      await db.close();
-    } catch (dbErr) {
-      logger.error('Error closing database connections', { error: dbErr });
-    }
-    
-    logger.info('Graceful shutdown completed');
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM received: shutting down gracefully');
+  server.close(() => {
+    logger.info('HTTP server closed');
     process.exit(0);
-  } catch (error) {
-    logger.error('Error during graceful shutdown', { error });
-    process.exit(1);
-  }
-}
+  });
+});
+
+process.on('SIGINT', () => {
+  logger.info('SIGINT received: shutting down gracefully');
+  server.close(() => {
+    logger.info('HTTP server closed');
+    process.exit(0);
+  });
+});

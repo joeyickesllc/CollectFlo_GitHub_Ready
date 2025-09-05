@@ -20,19 +20,19 @@ try {
  * SMS templates for different follow-up types
  */
 const SMS_TEMPLATES = {
-  pre_due_reminder: `Hi {{customerName}}, friendly reminder that invoice {{invoiceNumber}} (${{amount}}) is due tomorrow ({{dueDate}}). Pay online: {{paymentLink}} Thanks! - {{companyName}}`,
+  pre_due_reminder: `Hi {{customerName}}, friendly reminder that invoice {{invoiceNumber}} (\${{amount}}) is due tomorrow ({{dueDate}}). Pay online: {{paymentLink}} Thanks! - {{companyName}}`,
   
-  due_date_notice: `Hi {{customerName}}, invoice {{invoiceNumber}} (${{amount}}) is due today. Pay online: {{paymentLink}} Thanks! - {{companyName}}`,
+  due_date_notice: `Hi {{customerName}}, invoice {{invoiceNumber}} (\${{amount}}) is due today. Pay online: {{paymentLink}} Thanks! - {{companyName}}`,
   
-  gentle_reminder: `Hi {{customerName}}, hope you're well. Just a reminder that invoice {{invoiceNumber}} (${{amount}}) was due {{daysOverdue}} days ago. Pay online: {{paymentLink}} Thanks! - {{companyName}}`,
+  gentle_reminder: `Hi {{customerName}}, hope you're well. Just a reminder that invoice {{invoiceNumber}} (\${{amount}}) was due {{daysOverdue}} days ago. Pay online: {{paymentLink}} Thanks! - {{companyName}}`,
   
-  second_reminder: `Hi {{customerName}}, invoice {{invoiceNumber}} (${{amount}}) is {{daysOverdue}} days past due. Please pay today: {{paymentLink}} Call me if any issues. - {{companyName}}`,
+  second_reminder: `Hi {{customerName}}, invoice {{invoiceNumber}} (\${{amount}}) is {{daysOverdue}} days past due. Please pay today: {{paymentLink}} Call me if any issues. - {{companyName}}`,
   
-  firm_reminder: `{{customerName}}, invoice {{invoiceNumber}} (${{amount}}) is {{daysOverdue}} days overdue. PAY NOW to avoid escalation: {{paymentLink}} Call me today. - {{companyName}}`,
+  firm_reminder: `{{customerName}}, invoice {{invoiceNumber}} (\${{amount}}) is {{daysOverdue}} days overdue. PAY NOW to avoid escalation: {{paymentLink}} Call me today. - {{companyName}}`,
   
-  fourth_reminder: `{{customerName}}, CRITICAL: Invoice {{invoiceNumber}} (${{amount}}) is {{daysOverdue}} days overdue. Account in jeopardy. PAY IMMEDIATELY: {{paymentLink}} Call NOW to avoid legal action. - {{companyName}}`,
+  fourth_reminder: `{{customerName}}, CRITICAL: Invoice {{invoiceNumber}} (\${{amount}}) is {{daysOverdue}} days overdue. Account in jeopardy. PAY IMMEDIATELY: {{paymentLink}} Call NOW to avoid legal action. - {{companyName}}`,
   
-  final_notice: `{{customerName}}, FINAL NOTICE: Invoice {{invoiceNumber}} (${{amount}}) is {{daysOverdue}} days overdue. PAY IMMEDIATELY: {{paymentLink}} or legal action in 7 days. Call now. - {{companyName}}`
+  final_notice: `{{customerName}}, FINAL NOTICE: Invoice {{invoiceNumber}} (\${{amount}}) is {{daysOverdue}} days overdue. PAY IMMEDIATELY: {{paymentLink}} or legal action in 7 days. Call now. - {{companyName}}`
 };
 
 /**

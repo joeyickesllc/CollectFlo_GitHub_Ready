@@ -14,9 +14,8 @@ const logger = require('../services/logger');
  * @param {Error} err - The error object.
  * @param {Object} req - The Express request object.
  * @param {Object} res - The Express response object.
- * @param {Function} next - The next middleware function.
  */
-module.exports = (err, req, res, next) => {
+module.exports = (err, req, res) => {
   // Log the error using the centralized logger
   logger.error(`Unhandled error in API route: ${req.method} ${req.originalUrl}`, {
     requestId: req.requestId, // Assuming requestId is attached by a preceding middleware

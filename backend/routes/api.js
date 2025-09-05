@@ -35,14 +35,14 @@ const {
   requireRole,
 } = require('../middleware/jwtAuthMiddleware');
 const errorMiddleware = require('../middleware/errorMiddleware');
-const { trackPageVisit, trackBetaSignup, trackLogin, trackUserAction } = require('../middleware/trackingMiddleware');
+const { trackBetaSignup, trackLogin, trackUserAction } = require('../middleware/trackingMiddleware');
 const {
   validateLogin,
   validateSignup,
   authRateLimiter,
   signupRateLimiter,
 } = require('../middleware/securityMiddleware');
-const { checkTrialStatus, requireActiveSubscription } = require('../middleware/trialMiddleware');
+const { checkTrialStatus } = require('../middleware/trialMiddleware');
 const logger = require('../services/logger');
 const db = require('../db/connection'); // <-- DB connection for setup route
 
@@ -206,7 +206,7 @@ router.get('/user-info', optionalAuth, async (req, res, next) => {
  * Dashboard Routes
  * All dashboard routes require authentication
  */
-router.get('/dashboard/stats', requireAuth, checkTrialStatus, async (req, res, next) => {
+router.get('/dashboard/stats', requireAuth, checkTrialStatus, async (req, res) => {
   try {
     const userId = req.user.id;
     console.log('Dashboard stats request for user:', userId);
@@ -432,7 +432,7 @@ router.get('/settings', requireAuth, checkTrialStatus, async (req, res, next) =>
 router.post('/settings', requireAuth, checkTrialStatus, async (req, res, next) => {
   try {
     const userId = req.user.id;
-    const { company_name, email, phone, reply_to_email } = req.body;
+    const { company_name, phone, reply_to_email } = req.body;
     
     // Update company name if provided
     if (company_name) {
@@ -504,72 +504,13 @@ router.post('/admin/test', requireAuth, async (req, res, next) => {
 /**
  * Manual Follow-Up Processing Trigger (for testing and troubleshooting)
  */
-router.post('/admin/trigger-followups', requireAuth, async (req, res, next) => {
+router.post('/admin/trigger-followups', requireAuth, async (req, res) => {
   try {
-    const userId = req.user.id;
-    
-    logger.info('Manual follow-up processing endpoint called', { 
-      userId,
-      timestamp: new Date().toISOString()
-    });
-    
-    // Get user's company ID
-    const userCompany = await db.queryOne(
-      'SELECT company_id FROM users WHERE id = $1',
-      [userId]
-    );
-    
-    logger.info('User company lookup result', { 
-      userId, 
-      userCompany: userCompany ? { company_id: userCompany.company_id } : null 
-    });
-    
-    if (!userCompany) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'User company not found' 
-      });
-    }
-    
-    logger.info('Manual follow-up processing triggered', { 
-      userId, 
-      companyId: userCompany.company_id 
-    });
-    
-    // Import and trigger follow-up processing
-    const { processPendingFollowUps } = require('../../services/followUpProcessor');
-    
-    const results = await processPendingFollowUps(userCompany.company_id, 100);
-    
-    logger.info('Manual follow-up processing completed', {
-      userId,
-      companyId: userCompany.company_id,
-      results
-    });
-    
-    res.json({ 
-      success: true, 
-      message: 'Follow-up processing completed',
-      results: {
-        processed: results.processed,
-        successful: results.successful,
-        failed: results.failed,
-        duration: results.duration,
-        errors: results.errors
-      }
-    });
-    
+    const { triggerManualProcessing } = require('../../services/followUpScheduler');
+    const results = await triggerManualProcessing(false);
+    res.json({ success: true, results });
   } catch (error) {
-    logger.error('Error in manual follow-up processing', {
-      error: error.message,
-      stack: error.stack,
-      userId: req.user?.id
-    });
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 
@@ -594,14 +535,12 @@ router.post('/templates/:id', requireAuth, async (req, res, next) => {
 /**
  * Invoice & Payment Routes
  */
-router.get('/create-payment-link/:invoiceId', requireAuth, async (req, res, next) => {
+router.get('/create-payment-link/:invoiceId', requireAuth, async (req, res) => {
   try {
-    const invoiceId = req.params.invoiceId;
-    const userId = req.user.id;
-    
+    const { invoiceId } = req.params;
     const { generateQuickBooksPaymentLink } = require('../../services/paymentLinkService');
     
-    const paymentLinkData = await generateQuickBooksPaymentLink(invoiceId, userId);
+    const paymentLinkData = await generateQuickBooksPaymentLink(invoiceId, req.user.id);
     
     res.json({
       success: true,
@@ -854,10 +793,10 @@ router.post('/follow-ups/:id/complete', requireAuth, async (req, res, next) => {
 /**
  * Follow-Up Processing Routes
  */
-router.post('/follow-ups/process', requireAuth, async (req, res, next) => {
+router.post('/follow-ups/process', requireAuth, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { companyId, urgentOnly = false, limit = 50 } = req.body;
+    const { companyId, urgentOnly = false } = req.body;
     
     // Get user's company ID for security
     const userCompany = await db.queryOne(
@@ -890,7 +829,7 @@ router.post('/follow-ups/process', requireAuth, async (req, res, next) => {
       results
     });
   } catch (error) {
-    next(error);
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 
@@ -1102,17 +1041,16 @@ router.post('/follow-ups/force-send', requireAuth, async (req, res, next) => {
   }
 });
 
-router.post('/follow-ups/admin-process', requireAuth, async (req, res, next) => {
+router.post('/follow-ups/admin-process', requireAuth, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ success: false, message: 'Admin access required' });
     }
-    
-    const { companyId, limit = 5 } = req.body;
-    
+
+    const { companyId } = req.body;
+
     const { triggerManualProcessing } = require('../../services/followUpScheduler');
     const results = await triggerManualProcessing(false);
-    
     res.json({
       success: true,
       message: 'Admin follow-up processing completed',
@@ -1120,14 +1058,14 @@ router.post('/follow-ups/admin-process', requireAuth, async (req, res, next) => 
       companyRequested: companyId
     });
   } catch (error) {
-    next(error);
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 
 /**
  * Test Routes (for development only)
  */
-router.post('/test-email', requireAuth, async (req, res, next) => {
+router.post('/test-email', requireAuth, async (req, res) => {
   try {
     const { toEmail, testData } = req.body;
 
@@ -1177,7 +1115,6 @@ router.post('/test-email', requireAuth, async (req, res, next) => {
     });
 
     // Return a more helpful error payload to assist troubleshooting in the UI
-    const details = error?.response?.body || error?.body || undefined;
     const errorInfo = {
       success: false,
       message: 'Failed to send test email',
@@ -1300,7 +1237,7 @@ router.get('/setup-qbo-table', async (req, res) => {
     });
   } catch (error) {
     // Roll back if we’re mid-transaction
-    try { await db.query('ROLLBACK'); } catch (_) {}
+    try { await db.query('ROLLBACK'); } catch (rollbackErr) { logger.warn('ROLLBACK failed', { error: rollbackErr.message }); }
     logger.error('setup-qbo-table failed', { error: error.message });
     return res.status(500).json({
       success : false,
@@ -1314,7 +1251,7 @@ router.get('/setup-qbo-table', async (req, res) => {
  * Admin User Creation Route (protected by environment variable)
  * Only works when ADMIN_SETUP_SECRET is set in environment
  */
-router.post('/create-admin', async (req, res, next) => {
+router.post('/create-admin', async (req, res) => {
   try {
     const { email, password, name, company_name, admin_secret } = req.body;
     
@@ -1410,10 +1347,7 @@ router.post('/create-admin', async (req, res, next) => {
 
   } catch (error) {
     logger.error('Error creating admin user', { error: error.message });
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to create admin user'
-    });
+    return res.status(500).json({ success: false, message: 'Failed to create admin user' });
   }
 });
 
@@ -1421,7 +1355,7 @@ router.post('/create-admin', async (req, res, next) => {
  * Promote User to Admin Route (protected by environment variable)
  * Only works when ADMIN_SETUP_SECRET is set in environment
  */
-router.post('/promote-to-admin', async (req, res, next) => {
+router.post('/promote-to-admin', async (req, res) => {
   try {
     const { email, admin_secret } = req.body;
     
@@ -1514,10 +1448,7 @@ router.post('/promote-to-admin', async (req, res, next) => {
 
   } catch (error) {
     logger.error('Error promoting user to admin', { error: error.message, email: req.body.email });
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to promote user to admin'
-    });
+    return res.status(500).json({ success: false, message: 'Failed to promote user to admin' });
   }
 });
 
@@ -1527,7 +1458,7 @@ router.post('/promote-to-admin', async (req, res, next) => {
  */
 
 // Create Stripe Checkout Session
-router.post('/create-checkout-session', requireAuth, checkTrialStatus, async (req, res, next) => {
+router.post('/create-checkout-session', requireAuth, checkTrialStatus, async (req, res) => {
   try {
     const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
     const { plan } = req.body;
@@ -1610,10 +1541,7 @@ router.post('/create-checkout-session', requireAuth, checkTrialStatus, async (re
       error: error.message,
       userId: req.user?.id 
     });
-    return res.status(500).json({
-      success: false,
-      message: 'Unable to create checkout session. Please try again.'
-    });
+    return res.status(500).json({ success: false, message: 'Unable to create checkout session. Please try again.' });
   }
 });
 
@@ -1652,6 +1580,7 @@ router.get('/admin/stats', requireAuth, requireRole('admin'), async (req, res, n
     // Page view analytics
     let pageViewStats = {
       totalPageViews: 0,
+      todayViews: 0,
       pagesByEndpoint: [],
       pagesBySource: [],
       topPages: []
@@ -1665,19 +1594,27 @@ router.get('/admin/stats', requireAuth, requireRole('admin'), async (req, res, n
         WHERE activity_type = 'page_visit'
       `);
 
-      // Page views by endpoint (path)
-      const viewsByEndpoint = await db.query(`
-        SELECT 
-          details->>'path' as path,
-          COUNT(*)::int as views,
-          COUNT(DISTINCT user_id)::int as unique_users
-        FROM user_activity 
-        WHERE activity_type = 'page_visit' 
-        AND details->>'path' IS NOT NULL
-        GROUP BY details->>'path'
-        ORDER BY views DESC
-        LIMIT 10
+      // Today's page views
+      const todayViews = await db.queryOne(`
+        SELECT COUNT(*)::int AS count
+        FROM user_activity
+        WHERE activity_type = 'page_visit'
+          AND DATE(created_at) = CURRENT_DATE
       `);
+
+      // Page views by endpoint (path) - currently not displayed, can be re-enabled if needed
+      // const viewsByEndpoint = await db.query(`
+      //   SELECT 
+      //     details->>'path' as path,
+      //     COUNT(*)::int as views,
+      //     COUNT(DISTINCT user_id)::int as unique_users
+      //   FROM user_activity 
+      //   WHERE activity_type = 'page_visit' 
+      //   AND details->>'path' IS NOT NULL
+      //   GROUP BY details->>'path'
+      //   ORDER BY views DESC
+      //   LIMIT 10
+      // `);
 
       // Page views by referral source  
       const viewsBySource = await db.query(`
@@ -1720,6 +1657,7 @@ router.get('/admin/stats', requireAuth, requireRole('admin'), async (req, res, n
 
       pageViewStats = {
         totalViews: totalViews?.count || 0,
+        todayViews: todayViews?.count || 0,
         topPages: (topPages || []).map(p => ({
           page: p.path,
           views: p.views

@@ -135,7 +135,7 @@ async function main() {
     console.error('[PREFLIGHT] ERROR:', err.message);
     process.exit(2);
   } finally {
-    try { await client.end(); } catch {}
+    try { await client.end(); } catch (closeErr) { console.warn('[PREFLIGHT] Failed to close client:', closeErr?.message); }
   }
 }
 

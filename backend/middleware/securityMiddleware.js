@@ -13,13 +13,13 @@
 
 const { body, validationResult, oneOf } = require('express-validator');
 const rateLimit = require('express-rate-limit');
-const xssClean = require('xss-clean');
+// const xssClean = require('xss-clean');
 const helmet = require('helmet');
 const logger = require('../services/logger');
 
 // Environment configuration
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
-const IS_RENDER = process.env.RENDER === 'true';
+// const IS_RENDER = process.env.RENDER === 'true';
 
 /**
  * Apply basic security middleware to Express app

@@ -105,6 +105,8 @@ function renderPageAnalytics(pageViews) {
 
   // Update total page views in header
   setText('totalPageViews', pageViews.totalViews || '-');
+  // Update today's page views in header
+  setText('todaysPageViews', pageViews.todayViews || '-');
 
   // Render top pages by views
   const topPagesEl = document.getElementById('topPagesByViews');

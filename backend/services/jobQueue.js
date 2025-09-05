@@ -17,9 +17,9 @@
  */
 
 const Bull = require('bull');
-const path = require('path');
-const fs = require('fs');
-const { promisify } = require('util');
+// const path = require('path');
+// const fs = require('fs');
+// const { promisify } = require('util');
 const net = require('net');
 const tls = require('tls'); // For TLS-based Redis (rediss://)
 require('dotenv').config();
