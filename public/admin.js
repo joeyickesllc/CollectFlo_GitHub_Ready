@@ -108,6 +108,12 @@ function renderPageAnalytics(pageViews) {
   // Update today's page views in header
   setText('todaysPageViews', pageViews.todayViews || '-');
 
+  // Update today's funnel views
+  const funnel = pageViews.funnelToday || {};
+  setText('todayRootViews', funnel.root ?? '-');
+  setText('todaySignupViews', funnel.signup ?? '-');
+  setText('todayOnboardingViews', funnel.onboarding ?? '-');
+
   // Render top pages by views
   const topPagesEl = document.getElementById('topPagesByViews');
   if (topPagesEl && pageViews.topPages) {

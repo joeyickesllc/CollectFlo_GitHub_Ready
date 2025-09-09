@@ -1599,8 +1599,27 @@ router.get('/admin/stats', requireAuth, requireRole('admin'), async (req, res, n
         SELECT COUNT(*)::int AS count
         FROM user_activity
         WHERE activity_type = 'page_visit'
-          AND DATE(created_at) = CURRENT_DATE
+          AND (created_at AT TIME ZONE 'America/Chicago')::date = (NOW() AT TIME ZONE 'America/Chicago')::date
       `);
+
+      // Today's funnel by specific paths
+      const funnelTodayRows = await db.query(`
+        SELECT 
+          details->>'path' as path,
+          COUNT(*)::int as views
+        FROM user_activity
+        WHERE activity_type = 'page_visit'
+          AND (created_at AT TIME ZONE 'America/Chicago')::date = (NOW() AT TIME ZONE 'America/Chicago')::date
+          AND details->>'path' IN ('/', '/signup', '/onboarding')
+        GROUP BY details->>'path'
+      `);
+
+      const funnelToday = { root: 0, signup: 0, onboarding: 0 };
+      (funnelTodayRows || []).forEach(r => {
+        if (r.path === '/') funnelToday.root = r.views;
+        else if (r.path === '/signup') funnelToday.signup = r.views;
+        else if (r.path === '/onboarding') funnelToday.onboarding = r.views;
+      });
 
       // Page views by endpoint (path) - currently not displayed, can be re-enabled if needed
       // const viewsByEndpoint = await db.query(`
@@ -1658,6 +1677,7 @@ router.get('/admin/stats', requireAuth, requireRole('admin'), async (req, res, n
       pageViewStats = {
         totalViews: totalViews?.count || 0,
         todayViews: todayViews?.count || 0,
+        funnelToday: funnelToday,
         topPages: (topPages || []).map(p => ({
           page: p.path,
           views: p.views
