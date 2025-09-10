@@ -1651,18 +1651,36 @@ router.get('/admin/stats', requireAuth, requireRole('admin'), async (req, res, n
 
     // Page view analytics
     let pageViewStats = {
-      totalPageViews: 0,
+      totalViews: 0,
+      totalUniqueVisitors: 0,
       pagesByEndpoint: [],
       pagesBySource: [],
-      topPages: []
+      topPages: [],
+      landing: null
     };
 
     try {
-      // Total page views
+      // Total page views and unique visitors
       const totalViews = await db.queryOne(`
         SELECT COUNT(*)::int AS count 
         FROM user_activity 
         WHERE activity_type = 'page_visit'
+      `);
+      const totalUniqueVisitors = await db.queryOne(`
+        SELECT COUNT(DISTINCT COALESCE(NULLIF(visitor_id, ''), ip_address))::int AS count
+        FROM user_activity
+        WHERE activity_type = 'page_visit'
+      `);
+      
+      // Landing page metrics (root and landing.html)
+      const landingAgg = await db.queryOne(`
+        SELECT 
+          COUNT(*)::int as views,
+          COUNT(DISTINCT user_id)::int as unique_users,
+          COUNT(DISTINCT COALESCE(NULLIF(visitor_id, ''), ip_address))::int as unique_visitors
+        FROM user_activity
+        WHERE activity_type = 'page_visit'
+          AND (details->>'path' IN ('/', '/landing.html'))
       `);
 
       // Page views by endpoint (path)
@@ -1670,7 +1688,8 @@ router.get('/admin/stats', requireAuth, requireRole('admin'), async (req, res, n
         SELECT 
           details->>'path' as path,
           COUNT(*)::int as views,
-          COUNT(DISTINCT user_id)::int as unique_users
+          COUNT(DISTINCT user_id)::int as unique_users,
+          COUNT(DISTINCT COALESCE(NULLIF(visitor_id, ''), ip_address))::int as unique_visitors
         FROM user_activity 
         WHERE activity_type = 'page_visit' 
         AND details->>'path' IS NOT NULL
@@ -1694,7 +1713,8 @@ router.get('/admin/stats', requireAuth, requireRole('admin'), async (req, res, n
             ELSE 'Other'
           END as source,
           COUNT(*)::int as views,
-          COUNT(DISTINCT user_id)::int as unique_users
+          COUNT(DISTINCT user_id)::int as unique_users,
+          COUNT(DISTINCT COALESCE(NULLIF(visitor_id, ''), ip_address))::int as unique_visitors
         FROM user_activity 
         WHERE activity_type = 'page_visit'
         GROUP BY source
@@ -1708,6 +1728,7 @@ router.get('/admin/stats', requireAuth, requireRole('admin'), async (req, res, n
           details->>'path' as path,
           COUNT(*)::int as views,
           COUNT(DISTINCT user_id)::int as unique_users,
+          COUNT(DISTINCT COALESCE(NULLIF(visitor_id, ''), ip_address))::int as unique_visitors,
           COUNT(DISTINCT DATE(created_at))::int as active_days,
           MAX(created_at) as last_visit
         FROM user_activity 
@@ -1720,6 +1741,7 @@ router.get('/admin/stats', requireAuth, requireRole('admin'), async (req, res, n
 
       pageViewStats = {
         totalViews: totalViews?.count || 0,
+        totalUniqueVisitors: totalUniqueVisitors?.count || 0,
         topPages: (topPages || []).map(p => ({
           page: p.path,
           views: p.views
@@ -1731,15 +1753,22 @@ router.get('/admin/stats', requireAuth, requireRole('admin'), async (req, res, n
         performance: (topPages || []).map(p => ({
           page: p.path,
           unique_users: p.unique_users,
+          unique_visitors: p.unique_visitors,
           active_days: p.active_days
         })),
         detailed: (topPages || []).map(p => ({
           page: p.path,
           total_views: p.views,
           unique_users: p.unique_users,
+          unique_visitors: p.unique_visitors,
           active_days: p.active_days,
           last_visit: p.last_visit
-        }))
+        })),
+        landing: landingAgg ? {
+          views: landingAgg.views || 0,
+          unique_users: landingAgg.unique_users || 0,
+          unique_visitors: landingAgg.unique_visitors || 0
+        } : null
       };
 
     } catch (error) {
@@ -1770,6 +1799,11 @@ router.get('/admin/stats', requireAuth, requireRole('admin'), async (req, res, n
     next(error);
   }
 });
+
+/**
+ * Public: Landing page metrics (visitors vs users)
+ */
+// (Removed) Public landing metrics endpoint per request
 
 // Centralized error handling for API routes
 router.use(errorMiddleware);

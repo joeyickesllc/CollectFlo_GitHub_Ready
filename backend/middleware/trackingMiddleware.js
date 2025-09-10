@@ -13,6 +13,7 @@
 
 const db = require('../db/connection');
 const logger = require('../services/logger');
+const crypto = require('crypto');
 
 // ---------------------------------------------------------------------------
 // Tracking state
@@ -21,6 +22,7 @@ const logger = require('../services/logger');
 // `user_activity` table structure (ip_address column) once per lifecycle
 // instead of on every request.  This avoids unnecessary queries at runtime.
 let userActivityColumnChecked = false;
+let userActivityVisitorColumnChecked = false;
 let sequenceSyncChecked = false;
 
 /**
@@ -42,6 +44,7 @@ exports.trackPageVisit = async (req, res, next) => {
 
   try {
     const userId = req.session?.user?.id || null;
+    const visitorId = getOrSetVisitorId(req, res);
     const path = req.path;
     const referrer = req.get('Referrer') || null;
     const userAgent = req.get('User-Agent') || null;
@@ -50,6 +53,7 @@ exports.trackPageVisit = async (req, res, next) => {
     // Store activity asynchronously (don't block request)
     storeActivity({
       user_id: userId,
+      visitor_id: visitorId,
       activity_type: 'page_visit',
       details: {
         path,
@@ -99,10 +103,12 @@ exports.trackLogin = async (req, res, next) => {
       const isSuccessful = responseData?.success === true;
       const userId = isSuccessful && req.session?.user?.id ? req.session.user.id : null;
       const email = req.body?.email;
+      const visitorId = getOrSetVisitorId(req, res);
       
       // Store activity asynchronously
       storeActivity({
         user_id: userId,
+        visitor_id: visitorId,
         activity_type: 'login_attempt',
         details: {
           email,
@@ -154,10 +160,12 @@ exports.trackBetaSignup = async (req, res, next) => {
       const userId = isSuccessful && responseData?.user?.id ? responseData.user.id : null;
       const email = req.body?.email;
       const company = req.body?.company_name || req.body?.companyName;
+      const visitorId = getOrSetVisitorId(req, res);
       
       // Store activity asynchronously
       storeActivity({
         user_id: userId,
+        visitor_id: visitorId,
         activity_type: 'beta_signup',
         details: {
           email,
@@ -212,6 +220,7 @@ exports.trackUserAction = (actionType, detailsExtractor) => {
         // Determine if action was successful
         const isSuccessful = responseData?.success === true;
         const userId = req.session?.user?.id || (isSuccessful && responseData?.user?.id ? responseData.user.id : null);
+        const visitorId = getOrSetVisitorId(req, res);
         
         // Extract details using provided function or default to basic info
         const details = detailsExtractor 
@@ -226,6 +235,7 @@ exports.trackUserAction = (actionType, detailsExtractor) => {
         // Store activity asynchronously
         storeActivity({
           user_id: userId,
+          visitor_id: visitorId,
           activity_type: actionType,
           details,
           ip_address: req.ip
@@ -288,6 +298,7 @@ async function ensureSequenceSync() {
  * @returns {Promise} Database query promise
  */
 async function storeActivity({ user_id, activity_type, details, ip_address }) {
+async function storeActivity({ user_id, visitor_id, activity_type, details, ip_address }) {
   try {
     // Check if the user_activity table exists
     const tableExists = await db.queryOne(`
@@ -335,6 +346,28 @@ async function storeActivity({ user_id, activity_type, details, ip_address }) {
       }
       userActivityColumnChecked = true;
     }
+
+    /* ------------------------------------------------------------------
+     * Ensure visitor_id column exists
+     * ------------------------------------------------------------------ */
+    if (!userActivityVisitorColumnChecked) {
+      const visitorColExists = await db.queryOne(
+        `SELECT EXISTS (
+           SELECT 1
+           FROM information_schema.columns
+           WHERE table_schema = 'public'
+             AND table_name   = 'user_activity'
+             AND column_name  = 'visitor_id'
+         ) AS exists;`
+      );
+
+      if (!visitorColExists || !visitorColExists.exists) {
+        logger.info('Adding missing visitor_id column to user_activity table');
+        await db.execute(`ALTER TABLE user_activity ADD COLUMN visitor_id TEXT;`);
+        await db.execute(`CREATE INDEX IF NOT EXISTS user_activity_visitor_id_idx ON user_activity(visitor_id);`);
+      }
+      userActivityVisitorColumnChecked = true;
+    }
     
     // Insert activity
     // ------------------------------------------------------------------
@@ -353,8 +386,8 @@ async function storeActivity({ user_id, activity_type, details, ip_address }) {
     await ensureSequenceSync();
 
     return await db.execute(
-      'INSERT INTO user_activity (user_id, activity_type, details, ip_address, created_at) VALUES ($1, $2, $3, $4, NOW())',
-      [user_id, activity_type, safeDetails, ip_address]
+      'INSERT INTO user_activity (user_id, visitor_id, activity_type, details, ip_address, created_at) VALUES ($1, $2, $3, $4, $5, NOW())',
+      [user_id, visitor_id || null, activity_type, safeDetails, ip_address]
     );
   } catch (error) {
     // Log error but don't throw - tracking should never break the app
@@ -363,6 +396,7 @@ async function storeActivity({ user_id, activity_type, details, ip_address }) {
       errorMessage: error.message,
       activity_type,
       user_id,
+      visitor_id,
       detailsKeys: details ? Object.keys(details) : 'no details provided'
     });
   }
@@ -399,6 +433,30 @@ function extractSourceFromReferrer(referrer) {
     // Otherwise, just use the hostname
     return hostname;
   } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * Get existing visitor_id from cookie or create a new one and set cookie
+ */
+function getOrSetVisitorId(req, res) {
+  try {
+    const COOKIE_NAME = 'cf_vid';
+    let vid = req.cookies && req.cookies[COOKIE_NAME];
+    if (!vid || typeof vid !== 'string' || vid.length < 10) {
+      vid = crypto.randomUUID ? crypto.randomUUID() : [Date.now(), Math.random().toString(36).slice(2)].join('-');
+      const isProd = process.env.NODE_ENV === 'production';
+      res.cookie(COOKIE_NAME, vid, {
+        httpOnly: false,
+        sameSite: 'lax',
+        secure: isProd,
+        path: '/',
+        maxAge: 180 * 24 * 60 * 60 * 1000 // 180 days
+      });
+    }
+    return vid;
+  } catch (_) {
     return null;
   }
 }

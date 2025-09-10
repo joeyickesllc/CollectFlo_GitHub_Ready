@@ -94,6 +94,14 @@ async function initAdmin() {
 
     renderRecentUsers(s.recentUsers);
     renderPageAnalytics(s.pageViews);
+
+    // Landing page metrics (if provided)
+    if (s.pageViews && s.pageViews.landing) {
+      const l = s.pageViews.landing;
+      setText('landingViews', l.views ?? '-');
+      setText('landingUniqueVisitors', l.unique_visitors ?? '-');
+      setText('landingUniqueUsers', l.unique_users ?? '-');
+    }
   } catch (err) {
     console.error('Admin load error:', err);
     showError(err.message || 'Failed to load admin stats');
@@ -105,6 +113,7 @@ function renderPageAnalytics(pageViews) {
 
   // Update total page views in header
   setText('totalPageViews', pageViews.totalViews || '-');
+  setText('totalUniqueVisitors', pageViews.totalUniqueVisitors || '-');
 
   // Render top pages by views
   const topPagesEl = document.getElementById('topPagesByViews');
@@ -157,7 +166,7 @@ function renderPageAnalytics(pageViews) {
         div.innerHTML = `
           <div class="text-sm font-medium">${perf.page}</div>
           <div class="text-xs text-gray-600 mt-1">
-            ${perf.unique_users} unique users, ${perf.active_days} active days
+            ${perf.unique_users} unique users, ${perf.unique_visitors ?? '-'} unique visitors, ${perf.active_days} active days
           </div>
         `;
         perfEl.appendChild(div);
@@ -178,6 +187,7 @@ function renderPageAnalytics(pageViews) {
           <td class="px-4 py-2 text-sm text-gray-700">${row.page}</td>
           <td class="px-4 py-2 text-sm text-gray-700">${row.total_views}</td>
           <td class="px-4 py-2 text-sm text-gray-700">${row.unique_users}</td>
+          <td class="px-4 py-2 text-sm text-gray-700">${row.unique_visitors ?? '-'}</td>
           <td class="px-4 py-2 text-sm text-gray-700">${row.active_days}</td>
           <td class="px-4 py-2 text-sm text-gray-700">${formatDateCST(row.last_visit)}</td>
         `;

@@ -24,6 +24,7 @@
       <div class="bg-white shadow rounded p-6">
         <div class="text-sm text-gray-500">Page Views</div>
         <div id="totalPageViews" class="text-3xl font-semibold mt-2">-</div>
+        <div class="text-gray-600 mt-1 text-sm">Unique Visitors: <span id="totalUniqueVisitors">-</span></div>
       </div>
       <div class="bg-white shadow rounded p-6">
         <div class="text-sm text-gray-500">Invoices</div>
@@ -42,6 +43,25 @@
           <div>Total: <span id="followupsTotal">-</span></div>
           <div>Pending: <span id="followupsPending">-</span></div>
           <div>Delivered: <span id="followupsDelivered">-</span></div>
+        </div>
+      </div>
+
+      <!-- Landing Page Metrics Card -->
+      <div class="bg-white shadow rounded p-6">
+        <h2 class="text-xl font-semibold mb-4">Landing Page (/, /landing.html)</h2>
+        <div class="grid grid-cols-3 gap-4">
+          <div>
+            <div class="text-xs text-gray-500">Views</div>
+            <div id="landingViews" class="text-xl font-semibold">-</div>
+          </div>
+          <div>
+            <div class="text-xs text-gray-500">Unique Visitors</div>
+            <div id="landingUniqueVisitors" class="text-xl font-semibold">-</div>
+          </div>
+          <div>
+            <div class="text-xs text-gray-500">Unique Users</div>
+            <div id="landingUniqueUsers" class="text-xl font-semibold">-</div>
+          </div>
         </div>
       </div>
 
@@ -104,6 +124,7 @@
                 <th class="px-4 py-2 text-left text-sm font-medium text-gray-500">Page</th>
                 <th class="px-4 py-2 text-left text-sm font-medium text-gray-500">Total Views</th>
                 <th class="px-4 py-2 text-left text-sm font-medium text-gray-500">Unique Users</th>
+                <th class="px-4 py-2 text-left text-sm font-medium text-gray-500">Unique Visitors</th>
                 <th class="px-4 py-2 text-left text-sm font-medium text-gray-500">Active Days</th>
                 <th class="px-4 py-2 text-left text-sm font-medium text-gray-500">Last Visit</th>
               </tr>
