@@ -297,7 +297,6 @@ async function ensureSequenceSync() {
  * @param {string} activity.ip_address - IP address
  * @returns {Promise} Database query promise
  */
-async function storeActivity({ user_id, activity_type, details, ip_address }) {
 async function storeActivity({ user_id, visitor_id, activity_type, details, ip_address }) {
   try {
     // Check if the user_activity table exists
