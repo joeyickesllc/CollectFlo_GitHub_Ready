@@ -41,12 +41,10 @@ async function loadNav() {
     const publicPages = [
       '/',
       '/landing',
-      '/beta',
       '/help',
       '/privacy',
       '/login',
       '/signup',
-      '/beta-signup',
       '/beta-stats'
     ];
 
@@ -156,9 +154,7 @@ function updateUnauthenticatedNavigation() {
   }
 
   if (userMenu) {
-    userMenu.innerHTML = `
-      <a href="/beta-signup" class="bg-blue-500 text-white px-4 py-2 rounded text-sm font-medium mr-2">Join Beta</a>
-    `;
+    userMenu.innerHTML = ``;
   }
 }
 
@@ -185,12 +181,10 @@ function shouldLoadNav() {
   const publicPages = [
     '/',
     '/landing',
-    '/beta',
     '/help',
     '/privacy',
     '/login',
     '/signup',
-    '/beta-signup',
     '/beta-stats'
   ];
 

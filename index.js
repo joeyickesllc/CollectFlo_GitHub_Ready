@@ -186,9 +186,9 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'landing.html'));
 });
 
-// Block debug HTML pages in production
+// Block debug and deprecated public HTML pages in production
 if (IS_PRODUCTION) {
-  const blockedDebugPages = ['/auth-diagnostics.html', '/login-debug.html'];
+  const blockedDebugPages = ['/auth-diagnostics.html', '/login-debug.html', '/beta.html', '/beta-signup.html'];
   app.get(blockedDebugPages, (req, res) => {
     return res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
   });
@@ -458,8 +458,6 @@ const htmlRoutes = [
   { path: '/settings', file: 'settings.html', auth: true },
   { path: '/templates', file: 'templates.html', auth: true },
   { path: '/onboarding', file: 'onboarding.html', auth: true },
-  { path: '/beta', file: 'beta.html' },
-  { path: '/beta-signup', file: 'beta-signup.html' },
   { path: '/beta-onboarding', file: 'beta-onboarding.html', auth: true },
   { path: '/beta-stats', file: 'beta-stats.html', auth: true },
   { path: '/admin', file: 'admin.html', auth: true, admin: true },
@@ -501,6 +499,11 @@ htmlRoutes.forEach(route => {
     
     res.sendFile(path.join(__dirname, 'public', route.file));
   });
+});
+
+// Redirect deprecated beta pages to public signup
+app.get(['/beta', '/beta-signup'], (req, res) => {
+  return res.redirect('/signup');
 });
 
 // Catch-all route for 404s

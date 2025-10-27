@@ -1447,7 +1447,7 @@ router.post('/promote-to-admin', async (req, res, next) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'User not found. Please sign up first at /beta-signup'
+        message: 'User not found. Please sign up first at /signup'
       });
     }
 
